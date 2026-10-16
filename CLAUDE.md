@@ -19,19 +19,22 @@ Full design: @docs/architecture.md. Read it before changing data, tables, metric
 - Free and free-tier only. Ask before adding anything that costs money.
 
 ## Commands
-<!-- filled in during setup step 3 -->
 - Install: `uv sync`
+- Add a dependency: `uv add <pkg>` (dev-only: `uv add --dev <pkg>`)
 - Tests: `uv run pytest`
 - Lint/format: `uv run ruff check . --fix && uv run ruff format .`
+- Lint/format check only (no changes): `uv run ruff check . && uv run ruff format --check .`
 
 ## Layout
-<!-- filled in during setup step 3 -->
-- `src/repo_health/collector/`: GitHub API → Postgres (plain Python, not an agent)
-- `src/repo_health/metrics/`: one SQL query + one Python function per metric
-- `src/repo_health/agent/`: ADK agent and its tools
-- `sql/`: schema and migrations
-- `evals/`: questions, gold answers computed by code, eval runner
-- `tests/`: unit tests (no network, no real LLM calls)
+- `pyproject.toml`: project metadata, dev dependencies (pytest, ruff), ruff config
+- `uv.lock`: exact pinned versions; commit it, never edit by hand
+- `src/repo_health/`: the `repo_health` package
+  - `collector/`: GitHub API → Postgres (plain Python, not an agent). Empty so far.
+  - `metrics/`: one SQL query + one Python function per metric. Empty so far.
+  - `agent/`: ADK agent and its tools. Empty so far.
+- `tests/`: unit tests (no network, no real LLM calls). `test_smoke.py` checks the package imports.
+- `docs/architecture.md`: full design
+- Not created yet: `sql/` (schema and migrations), `evals/` (questions, code-computed gold answers, eval runner)
 
 ## Rules that matter
 - **Agent is read-only.** Agent tools use the read-only DB role and only run fixed, parameterised SQL. No string-formatted SQL, ever.
