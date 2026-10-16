@@ -1,0 +1,27 @@
+{
+    "hooks": {
+      "PreToolUse": [
+        {
+          "matcher": "Bash|Read|Edit|Write",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "uv run --quiet python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/protect_secrets.py\""
+            }
+          ]
+        }
+      ],
+      "PostToolUse": [
+        {
+          "matcher": "Edit|Write",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "uv run --quiet python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/format_python.py\""
+            }
+          ]
+        }
+      ]
+    }
+  }
+  
