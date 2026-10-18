@@ -1,0 +1,74 @@
+# Development guide
+
+## Prerequisites
+- Python 3.12 (managed by [uv](https://docs.astral.sh/uv/))
+- Docker with Compose v2
+- Git and, optionally, the GitHub CLI (`gh`)
+
+## Quick start
+```bash
+git clone https://github.com/<you>/repo-health-agent.git
+cd repo-health-agent
+uv sync                                   # install dependencies from uv.lock
+cp .env.example .env                      # then set POSTGRES_PASSWORD
+docker compose up -d                      # start Postgres
+uv run pytest                             # run tests
+```
+
+## Project layout
+```
+src/repo_health/
+  collector/     GitHub API → Postgres (plain Python)
+  metrics/       one SQL query + function per metric
+  agent/         ADK agent and its tools
+tests/           unit tests (no network, no real LLM calls)
+docs/            architecture and development docs
+.claude/         Claude Code settings and hooks
+.github/         CI workflows
+compose.yaml     local Postgres (pgvector image)
+```
+
+## Workflow
+- `main` is protected: changes land only through pull requests.
+- CI must pass before merge: lint, format check, tests, secret scan.
+- One branch per step or feature, squash-merged into `main`.
+
+```bash
+git switch main && git pull
+git switch -c <feature-branch>
+# work, commit
+git push -u origin <feature-branch> && gh pr create --fill
+```
+
+## Checks (same as CI)
+```bash
+uv sync --locked
+uv run ruff check .
+uv run ruff format --check .
+uv run pytest
+```
+
+## Configuration
+All settings come from environment variables in `.env`. The file is git-ignored, and `.env.example` lists every variable.
+
+| Variable | Purpose |
+|---|---|
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Local database |
+| `GITHUB_TOKEN` | Fine-grained, read-only token for public repos |
+| `GEMINI_API_KEY`, `GEMINI_MODEL` | LLM access (free tier) |
+
+## AI-assisted development (Claude Code)
+- `CLAUDE.md`: project rules: stack, layout, coding rules, scope.
+- `CLAUDE.local.md`: personal preferences (git-ignored).
+- `.claude/settings.json`:
+  - Deny rules: no reading or editing `.env`, and no editing Claude's own settings or hooks.
+  - A post-edit hook runs ruff on every Python file Claude changes.
+
+## Key decisions
+| Decision | Reason |
+|---|---|
+| uv instead of pip/venv | One tool for Python versions, dependencies and lock file; fast and reproducible |
+| Plain parameterised SQL, no ORM | Metrics are analytical queries (medians, window functions); the SQL is the metric definition |
+| Postgres with pgvector image | Same database supports vector search for the planned issue-summariser agent |
+| Fixed metric tools instead of LLM-written SQL | Deterministic, testable numbers; the agent can't run arbitrary queries |
+| Data snapshot in Postgres | Repeatable answers for evals; no rate-limit pressure at question time |
