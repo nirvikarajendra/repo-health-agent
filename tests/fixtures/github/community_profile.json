@@ -1,0 +1,40 @@
+{
+    "health_percentage": 87,
+    "description": "A next generation HTTP client for Python. \ud83e\udd8b",
+    "documentation": "https://www.python-httpx.org/",
+    "files": {
+        "code_of_conduct": {
+            "key": "other",
+            "name": "Other",
+            "html_url": "https://github.com/encode/httpx/blob/master/docs/code_of_conduct.md",
+            "url": "https://api.github.com/repos/encode/httpx/community/code_of_conduct"
+        },
+        "code_of_conduct_file": {
+            "url": "https://api.github.com/repos/encode/httpx/contents/docs/code_of_conduct.md",
+            "html_url": "https://github.com/encode/httpx/blob/master/docs/code_of_conduct.md"
+        },
+        "contributing": {
+            "url": "https://api.github.com/repos/encode/httpx/contents/.github/CONTRIBUTING.md",
+            "html_url": "https://github.com/encode/httpx/blob/master/.github/CONTRIBUTING.md"
+        },
+        "issue_template": null,
+        "pull_request_template": {
+            "url": "https://api.github.com/repos/encode/httpx/contents/.github/PULL_REQUEST_TEMPLATE.md",
+            "html_url": "https://github.com/encode/httpx/blob/master/.github/PULL_REQUEST_TEMPLATE.md"
+        },
+        "license": {
+            "key": "bsd-3-clause",
+            "name": "BSD 3-Clause \"New\" or \"Revised\" License",
+            "spdx_id": "BSD-3-Clause",
+            "url": "https://api.github.com/licenses/bsd-3-clause",
+            "node_id": "MDc6TGljZW5zZTU=",
+            "html_url": "https://github.com/encode/httpx/blob/master/LICENSE.md"
+        },
+        "readme": {
+            "url": "https://api.github.com/repos/encode/httpx/contents/README.md",
+            "html_url": "https://github.com/encode/httpx/blob/master/README.md"
+        }
+    },
+    "updated_at": "2022-10-11T11:04:26Z",
+    "content_reports_enabled": true
+}
