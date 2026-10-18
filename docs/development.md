@@ -12,6 +12,7 @@ cd repo-health-agent
 uv sync                                   # install dependencies from uv.lock
 cp .env.example .env                      # then set POSTGRES_PASSWORD
 docker compose up -d                      # start Postgres
+uv run python -m repo_health.migrate      # apply DB migrations
 uv run pytest                             # run tests
 ```
 
@@ -54,6 +55,7 @@ All settings come from environment variables in `.env`. The file is git-ignored,
 | Variable | Purpose |
 |---|---|
 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Local database |
+| `DATABASE_URL` | Connection string the app and migrations use to reach Postgres |
 | `GITHUB_TOKEN` | Fine-grained, read-only token for public repos |
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | LLM access (free tier) |
 
