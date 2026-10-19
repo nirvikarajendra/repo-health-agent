@@ -1,8 +1,9 @@
 """Collect one repo's overview into the `repos` table."""
 
+import httpx
 import psycopg
 
-from repo_health.collector.github import get_json, make_client
+from repo_health.collector.github import get_json
 
 
 def parse_repo(repo: dict, community: dict) -> dict:
@@ -66,11 +67,10 @@ def upsert_repo(conn: psycopg.Connection, row: dict) -> None:
     conn.execute(UPSERT_REPO, row)
 
 
-def collect_repo(conn: psycopg.Connection, full_name: str) -> dict:
+def collect_repo(conn: psycopg.Connection, client: httpx.Client, full_name: str) -> dict:
     """Fetch one repo from GitHub and save it. Returns the saved row."""
-    with make_client() as client:
-        repo = get_json(client, f"/repos/{full_name}")
-        community = get_json(client, f"/repos/{full_name}/community/profile")
+    repo = get_json(client, f"/repos/{full_name}")
+    community = get_json(client, f"/repos/{full_name}/community/profile")
     row = parse_repo(repo, community)
     upsert_repo(conn, row)
     return row
