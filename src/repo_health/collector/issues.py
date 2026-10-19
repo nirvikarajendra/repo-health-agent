@@ -3,7 +3,7 @@
 import httpx
 import psycopg
 
-from repo_health.collector.github import get_all_pages
+from repo_health.collector.github import iter_pages
 
 
 def parse_issue(item: dict) -> dict:
@@ -72,11 +72,21 @@ def collect_issues(
     full_name: str,
     since: str,
 ) -> int:
-    items = get_all_pages(client, f"/repos/{full_name}/issues", {"state": "all", "since": since})
-    rows = [parse_issue(item) | {"repo_id": repo_id} for item in items]
-    with conn.cursor() as cur:
-        cur.executemany(UPSERT_ISSUE, rows)
-    return len(rows)
+    """Save ALL open issues/PRs (however old) plus everything updated since `since`.
+
+    GitHub's `since` filters on last update, so on its own it would skip old open issues
+    nobody touched, which are exactly the neglect we want to measure.
+    Returns the number of distinct issues/PRs saved.
+    """
+    queries = [{"state": "open"}, {"state": "all", "since": since}]
+    seen: set[int] = set()
+    for params in queries:
+        for page in iter_pages(client, f"/repos/{full_name}/issues", params):
+            rows = [parse_issue(item) | {"repo_id": repo_id} for item in page]
+            with conn.cursor() as cur:
+                cur.executemany(UPSERT_ISSUE, rows)
+            seen.update(row["number"] for row in rows)
+    return len(seen)
 
 
 def collect_comments(
@@ -86,8 +96,12 @@ def collect_comments(
     full_name: str,
     since: str,
 ) -> int:
-    items = get_all_pages(client, f"/repos/{full_name}/issues/comments", {"since": since})
-    rows = [parse_comment(item) | {"repo_id": repo_id} for item in items]
-    with conn.cursor() as cur:
-        cur.executemany(UPSERT_COMMENT, rows)
-    return len(rows)
+    """Save comments updated since `since`. Returns the number of distinct comments."""
+    seen: set[int] = set()
+    path = f"/repos/{full_name}/issues/comments"
+    for page in iter_pages(client, path, {"since": since}):
+        rows = [parse_comment(item) | {"repo_id": repo_id} for item in page]
+        with conn.cursor() as cur:
+            cur.executemany(UPSERT_COMMENT, rows)
+        seen.update(row["id"] for row in rows)
+    return len(seen)
