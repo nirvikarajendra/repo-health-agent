@@ -33,9 +33,11 @@ Full design: @docs/architecture.md. Read it before changing data, tables, metric
 - `src/repo_health/`: the `repo_health` package
   - `config.py`: settings from environment variables / `.env` (Pydantic Settings)
   - `db.py`: Postgres connection; `migrate.py`: applies new files from `sql/migrations/`
+  - `logs.py`: `setup_logging()` for the command-line entry points (terminal + `logs/` file)
   - `collector/`: GitHub API → Postgres (plain Python, not an agent). `github.py` is the read-only client (paging, rate limits); `repos.py` and `issues.py` each fetch, parse and upsert one kind of data; `__main__.py` runs every step.
   - `metrics/`: one SQL query + one Python function per metric. Empty so far.
   - `agent/`: ADK agent and its tools. Empty so far.
+- `logs/`: run logs, one file per day (`YYYY-MM-DD.log`, appended). Git-ignored.
 - `sql/migrations/`: numbered schema files (`001_initial_schema.sql`, …). Add a new file; never edit an applied one.
 - `tests/`: unit tests (no network, no real LLM calls). `conftest.py` has the shared fixtures (`load_fixture`, `fake_conn`, `fake_github`); `fixtures/github/` holds trimmed real API responses.
 - `docs/architecture.md`: full design; `docs/development.md`: setup and workflow

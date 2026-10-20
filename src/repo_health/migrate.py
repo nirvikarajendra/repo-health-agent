@@ -3,11 +3,15 @@
 Run with: uv run python -m repo_health.migrate
 """
 
+import logging
 from pathlib import Path
 
 from repo_health.db import connect
+from repo_health.logs import setup_logging
 
 MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "sql" / "migrations"
+
+log = logging.getLogger(__name__)
 
 
 def pending_migrations(files: list[Path], applied: set[str]) -> list[Path]:
@@ -16,6 +20,7 @@ def pending_migrations(files: list[Path], applied: set[str]) -> list[Path]:
 
 
 def main() -> None:
+    setup_logging()
     with connect() as conn:
         conn.execute(
             """
@@ -29,7 +34,7 @@ def main() -> None:
         applied = {row[0] for row in rows}
         todo = pending_migrations(list(MIGRATIONS_DIR.glob("*.sql")), applied)
         if not todo:
-            print("Database is up to date.")
+            log.info("Database is up to date.")
             return
         for path in todo:
             # One transaction per file.
@@ -39,7 +44,7 @@ def main() -> None:
                     "INSERT INTO schema_migrations (filename) VALUES (%s)",
                     (path.name,),
                 )
-            print(f"Applied {path.name}")
+            log.info("Applied %s", path.name)
 
 
 if __name__ == "__main__":
