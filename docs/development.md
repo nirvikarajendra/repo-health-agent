@@ -14,7 +14,7 @@ cp .env.example .env                      # then set POSTGRES_PASSWORD (and the 
 docker compose up -d                      # start Postgres
 uv run python -m repo_health.migrate      # apply DB migrations
 uv run pytest                             # run tests
-uv run python -m repo_health.collector encode/httpx   # collect one repo into Postgres
+uv run python -m repo_health.collector encode/httpx   # collect one or more OWNER/REPO into Postgres
 ```
 
 ## Project layout

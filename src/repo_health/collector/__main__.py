@@ -1,10 +1,13 @@
-"""Collect GitHub data for one repo.
+"""Collect GitHub data for one or more repos.
 
-Run with: uv run python -m repo_health.collector encode/httpx
+Run with: uv run python -m repo_health.collector encode/httpx [OWNER/REPO ...]
 """
 
 import sys
 from datetime import UTC, datetime, timedelta
+
+import httpx
+import psycopg
 
 from repo_health.collector.commits import collect_commits
 from repo_health.collector.github import make_client
@@ -18,43 +21,61 @@ from repo_health.db import connect
 WINDOW_DAYS = 365
 
 
+def collect_one(conn: psycopg.Connection, client: httpx.Client, full_name: str, since: str) -> None:
+    """Run every collector step for one repo."""
+    # Commit after each step so a failure later (e.g. rate limit) keeps finished work.
+    repo = collect_repo(conn, client, full_name)
+    conn.commit()
+    print(f"Saved {repo['full_name']}: {repo['stars']} stars")
+
+    n = collect_issues(conn, client, repo["id"], full_name, since)
+    conn.commit()
+    print(f"Saved {n} issues and PRs (all open + updated in the last {WINDOW_DAYS} days)")
+
+    n = collect_comments(conn, client, repo["id"], full_name, since)
+    conn.commit()
+    print(f"Saved {n} comments")
+
+    n = collect_pulls(conn, client, repo["id"], full_name, since)
+    conn.commit()
+    print(f"Saved {n} pull requests (all open + closed updated in the last {WINDOW_DAYS} days)")
+
+    params = {"repo_id": repo["id"], "since": since}
+    pr_numbers = [row[0] for row in conn.execute(SELECT_PR_NUMBERS, params)]
+    n = collect_reviews(conn, client, repo["id"], full_name, pr_numbers)
+    conn.commit()
+    print(f"Saved {n} reviews on {len(pr_numbers)} pull requests")
+
+    n = collect_releases(conn, client, repo["id"], full_name)
+    conn.commit()
+    print(f"Saved {n} releases")
+
+    n = collect_commits(conn, client, repo["id"], full_name, since)
+    conn.commit()
+    print(f"Saved {n} commits from the last {WINDOW_DAYS} days")
+
+
 def main() -> None:
-    if len(sys.argv) != 2:
-        sys.exit("Usage: python -m repo_health.collector OWNER/REPO")
-    full_name = sys.argv[1]
+    full_names = sys.argv[1:]
+    if not full_names:
+        sys.exit("Usage: python -m repo_health.collector OWNER/REPO [OWNER/REPO ...]")
     since = (datetime.now(UTC) - timedelta(days=WINDOW_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
+    failed: list[str] = []
     with connect() as conn, make_client() as client:
-        # Commit after each step so a failure later (e.g. rate limit) keeps finished work.
-        repo = collect_repo(conn, client, full_name)
-        conn.commit()
-        print(f"Saved {repo['full_name']}: {repo['stars']} stars")
+        for full_name in full_names:
+            print(f"== {full_name}")
+            try:
+                collect_one(conn, client, full_name, since)
+            except Exception as error:
+                # Drop the failed step's uncommitted rows so the next repo starts clean.
+                conn.rollback()
+                print(f"Failed {full_name}: {type(error).__name__}: {error}", file=sys.stderr)
+                failed.append(full_name)
 
-        n = collect_issues(conn, client, repo["id"], full_name, since)
-        conn.commit()
-        print(f"Saved {n} issues and PRs (all open + updated in the last {WINDOW_DAYS} days)")
-
-        n = collect_comments(conn, client, repo["id"], full_name, since)
-        conn.commit()
-        print(f"Saved {n} comments")
-
-        n = collect_pulls(conn, client, repo["id"], full_name, since)
-        conn.commit()
-        print(f"Saved {n} pull requests (all open + closed updated in the last {WINDOW_DAYS} days)")
-
-        params = {"repo_id": repo["id"], "since": since}
-        pr_numbers = [row[0] for row in conn.execute(SELECT_PR_NUMBERS, params)]
-        n = collect_reviews(conn, client, repo["id"], full_name, pr_numbers)
-        conn.commit()
-        print(f"Saved {n} reviews on {len(pr_numbers)} pull requests")
-
-        n = collect_releases(conn, client, repo["id"], full_name)
-        conn.commit()
-        print(f"Saved {n} releases")
-
-        n = collect_commits(conn, client, repo["id"], full_name, since)
-        conn.commit()
-        print(f"Saved {n} commits from the last {WINDOW_DAYS} days")
+    if failed:
+        print(f"{len(failed)} of {len(full_names)} repos failed: {', '.join(failed)}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
