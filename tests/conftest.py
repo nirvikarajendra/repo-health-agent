@@ -1,14 +1,24 @@
-"""Shared test fixtures: fixture loading, a fake database connection, a fake GitHub."""
+"""Shared test fixtures: fixture loading, fake and real database connections, a fake GitHub."""
 
 import json
 import re
 from pathlib import Path
 
 import httpx
+import psycopg
 import pytest
+from psycopg.conninfo import conninfo_to_dict
+
+from repo_health.config import get_settings
+from repo_health.migrate import apply_migrations
 
 FIXTURES = Path(__file__).parent / "fixtures" / "github"
 PLACEHOLDER = re.compile(r"%\((\w+)\)s")
+# Every data table; schema_migrations is kept so migrations aren't re-applied.
+TRUNCATE_ALL = """
+TRUNCATE repos, issues, comments, pull_requests, reviews, releases, commits, sync_runs
+RESTART IDENTITY CASCADE
+"""
 
 
 @pytest.fixture
@@ -93,3 +103,30 @@ def fake_github():
         )
 
     return build
+
+
+@pytest.fixture(scope="session")
+def migrated_db_url() -> str:
+    """TEST_DATABASE_URL, checked and migrated once per test run. Skips if it isn't set.
+
+    Never DATABASE_URL: every test wipes this database, so its name must end in _test.
+    """
+    url = get_settings().test_database_url
+    if not url:
+        pytest.skip("TEST_DATABASE_URL is not set")
+    dbname = conninfo_to_dict(url).get("dbname", "")
+    if not dbname.endswith("_test"):
+        pytest.fail(f"TEST_DATABASE_URL must name a database ending in _test, not {dbname!r}")
+    with psycopg.connect(url) as conn:
+        apply_migrations(conn)
+    return url
+
+
+@pytest.fixture
+def db_conn(migrated_db_url):
+    """A connection to the real test database, emptied before each test."""
+    with psycopg.connect(migrated_db_url) as conn:
+        conn.execute(TRUNCATE_ALL)
+        conn.commit()
+        yield conn
+        conn.rollback()  # Discard anything the test didn't commit itself.
