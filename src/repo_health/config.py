@@ -8,8 +8,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    database_url: str
+    database_url: str | None = None
     github_token: str | None = None
+    # Only for tests/test_sql.py.
+    test_database_url: str | None = None
 
 
 @lru_cache
