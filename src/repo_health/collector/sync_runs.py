@@ -13,7 +13,8 @@ UPDATE sync_runs
 SET status = %(status)s,
     finished_at = now(),
     requests_used = %(requests_used)s,
-    error = %(error)s
+    error = %(error)s,
+    repo_full_name = COALESCE(%(full_name)s, repo_full_name)
 WHERE id = %(run_id)s
 """
 
@@ -31,7 +32,15 @@ def finish_run(
     status: str,
     requests_used: int,
     error: str | None = None,
+    full_name: str | None = None,
 ) -> None:
-    params = {"run_id": run_id, "status": status, "requests_used": requests_used, "error": error}
+    """Record how the run ended. `full_name`, if given, replaces the name as typed."""
+    params = {
+        "run_id": run_id,
+        "status": status,
+        "requests_used": requests_used,
+        "error": error,
+        "full_name": full_name,
+    }
     conn.execute(FINISH_RUN, params)
     conn.commit()

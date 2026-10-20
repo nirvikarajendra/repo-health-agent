@@ -26,8 +26,8 @@ WINDOW_DAYS = 365
 log = logging.getLogger(__name__)
 
 
-def collect_one(conn: psycopg.Connection, client: httpx.Client, full_name: str, since: str) -> None:
-    """Run every collector step for one repo."""
+def collect_one(conn: psycopg.Connection, client: httpx.Client, full_name: str, since: str) -> str:
+    """Run every collector step for one repo. Returns GitHub's name for it."""
     # Commit after each step so a failure later (e.g. rate limit) keeps finished work.
     repo = collect_repo(conn, client, full_name)
     conn.commit()
@@ -60,6 +60,7 @@ def collect_one(conn: psycopg.Connection, client: httpx.Client, full_name: str, 
     n = collect_commits(conn, client, repo["id"], full_name, since)
     conn.commit()
     log.info("Saved %d commits from the last %d days", n, WINDOW_DAYS)
+    return repo["full_name"]
 
 
 def main() -> None:
@@ -83,7 +84,13 @@ def main() -> None:
             requests_used = 0
             run_id = start_run(conn, full_name)
             try:
-                collect_one(conn, client, full_name, since)
+                github_name = collect_one(conn, client, full_name, since)
+            except KeyboardInterrupt:
+                # Ctrl+C: record the run as failed instead of leaving it 'running', then stop.
+                conn.rollback()
+                finish_run(conn, run_id, "failed", requests_used, error="Interrupted")
+                log.warning("Interrupted %s", full_name)
+                raise
             except Exception as error:
                 # Drop the failed step's uncommitted rows so the next repo starts clean.
                 conn.rollback()
@@ -93,7 +100,7 @@ def main() -> None:
                 )
                 failed.append(full_name)
             else:
-                finish_run(conn, run_id, "success", requests_used)
+                finish_run(conn, run_id, "success", requests_used, full_name=github_name)
 
     if failed:
         log.error("%d of %d repos failed: %s", len(failed), len(full_names), ", ".join(failed))
