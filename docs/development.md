@@ -10,21 +10,28 @@
 git clone https://github.com/<you>/repo-health-agent.git
 cd repo-health-agent
 uv sync                                   # install dependencies from uv.lock
-cp .env.example .env                      # then set POSTGRES_PASSWORD
+cp .env.example .env                      # then set POSTGRES_PASSWORD (and the same password in DATABASE_URL)
 docker compose up -d                      # start Postgres
 uv run python -m repo_health.migrate      # apply DB migrations
 uv run pytest                             # run tests
+uv run python -m repo_health.collector encode/httpx   # collect one repo into Postgres
 ```
 
 ## Project layout
 ```
 src/repo_health/
+  config.py      settings from environment variables / .env
+  db.py          Postgres connection
+  migrate.py     applies new files from sql/migrations/
   collector/     GitHub API → Postgres (plain Python)
-  metrics/       one SQL query + function per metric
-  agent/         ADK agent and its tools
+  metrics/       one SQL query + function per metric (not started)
+  agent/         ADK agent and its tools (not started)
+sql/migrations/  numbered schema files; add new ones, never edit applied ones
 tests/           unit tests (no network, no real LLM calls)
+  conftest.py    shared fixtures: load_fixture, fake_conn, fake_github
+  fixtures/      trimmed real GitHub API responses
 docs/            architecture and development docs
-.claude/         Claude Code settings and hooks
+.claude/         Claude Code settings, hooks and skills
 .github/         CI workflows
 compose.yaml     local Postgres (pgvector image)
 ```
@@ -65,6 +72,7 @@ All settings come from environment variables in `.env`. The file is git-ignored,
 - `.claude/settings.json`:
   - Deny rules: no reading or editing `.env`, and no editing Claude's own settings or hooks.
   - A post-edit hook runs ruff on every Python file Claude changes.
+- `.claude/skills/add-collector-endpoint/`: run `/add-collector-endpoint <endpoint>` to add a new GitHub endpoint (plan → fixture → code → tests, with a stop for review after each step).
 
 ## Key decisions
 | Decision | Reason |
