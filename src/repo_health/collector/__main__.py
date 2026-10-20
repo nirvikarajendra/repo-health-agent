@@ -6,6 +6,7 @@ Run with: uv run python -m repo_health.collector encode/httpx
 import sys
 from datetime import UTC, datetime, timedelta
 
+from repo_health.collector.commits import collect_commits
 from repo_health.collector.github import make_client
 from repo_health.collector.issues import collect_comments, collect_issues
 from repo_health.collector.pulls import collect_pulls
@@ -43,6 +44,10 @@ def main() -> None:
         n = collect_releases(conn, client, repo["id"], full_name)
         conn.commit()
         print(f"Saved {n} releases")
+
+        n = collect_commits(conn, client, repo["id"], full_name, since)
+        conn.commit()
+        print(f"Saved {n} commits from the last {WINDOW_DAYS} days")
 
 
 if __name__ == "__main__":
