@@ -12,6 +12,7 @@ from repo_health.config import get_settings
 API_URL = "https://api.github.com"
 API_VERSION = "2026-03-10"
 MAX_RETRIES = 3
+SECONDARY_LIMIT_WAIT = 60  # seconds
 
 log = logging.getLogger(__name__)
 
@@ -38,18 +39,6 @@ def make_client(transport: httpx.BaseTransport | None = None) -> httpx.Client:
     )
 
 
-def check_response(response: httpx.Response) -> None:
-    """Raise a clear RateLimitError when out of requests, otherwise any HTTP error."""
-    if response.status_code in (403, 429):
-        if response.headers.get("X-RateLimit-Remaining") == "0":
-            reset = int(response.headers.get("X-RateLimit-Reset", "0"))
-            reset_at = datetime.fromtimestamp(reset, UTC).strftime("%H:%M UTC")
-            raise RateLimitError(f"GitHub rate limit reached. It resets at {reset_at}.")
-        if "Retry-After" in response.headers:
-            raise RateLimitError("GitHub secondary rate limit reached. Slow down and retry.")
-    response.raise_for_status()
-
-
 def rate_limit_wait(response: httpx.Response) -> tuple[float, str] | None:
     """Return (seconds to wait, reason) if GitHub rate-limited this request, else None."""
     if response.status_code not in (403, 429):
@@ -59,7 +48,21 @@ def rate_limit_wait(response: httpx.Response) -> tuple[float, str] | None:
     if response.headers.get("X-RateLimit-Remaining") == "0":
         reset = int(response.headers.get("X-RateLimit-Reset", "0"))
         return max(reset - time.time(), 0) + 1, "hourly limit used up"
-    return None
+    # GitHub's docs: a secondary limit without either header means wait at least a minute.
+    if "secondary rate limit" in response.text.lower():
+        return SECONDARY_LIMIT_WAIT, "secondary rate limit"
+    return None  # A plain 403, e.g. no permission: not worth retrying.
+
+
+def check_response(response: httpx.Response) -> None:
+    """Raise a clear RateLimitError when rate-limited, otherwise any HTTP error."""
+    if rate_limit_wait(response) is not None:
+        message = "GitHub rate limit reached."
+        if response.headers.get("X-RateLimit-Remaining") == "0":
+            reset = int(response.headers.get("X-RateLimit-Reset", "0"))
+            message += f" It resets at {datetime.fromtimestamp(reset, UTC):%H:%M UTC}."
+        raise RateLimitError(message)
+    response.raise_for_status()
 
 
 def get(
@@ -68,23 +71,21 @@ def get(
     params: dict | None = None,
     sleep: Callable[[float], None] = time.sleep,
 ) -> httpx.Response:
-    """GET with up to MAX_RETRIES waits on rate limits. `sleep` lets tests skip real waits."""
-    for attempt in range(1, MAX_RETRIES + 1):
+    """GET, retrying up to MAX_RETRIES times on rate limits. `sleep` lets tests skip real waits."""
+    for attempt in range(MAX_RETRIES + 1):
         response = client.get(url, params=params)
         wait = rate_limit_wait(response)
-        if wait is None:
+        if wait is None or attempt == MAX_RETRIES:
             break
         seconds, reason = wait
         log.warning(
             "Rate limited (%s): waiting %.0fs before retry %d/%d",
             reason,
             seconds,
-            attempt,
+            attempt + 1,
             MAX_RETRIES,
         )
         sleep(seconds)
-    else:
-        response = client.get(url, params=params)  # Last try after the final wait.
     check_response(response)
     return response
 

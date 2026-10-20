@@ -6,6 +6,7 @@ import pytest
 from repo_health.collector.github import (
     API_VERSION,
     MAX_RETRIES,
+    SECONDARY_LIMIT_WAIT,
     RateLimitError,
     get,
     get_json,
@@ -92,6 +93,32 @@ def test_get_raises_rate_limit_error_after_max_retries():
 
     assert len(slept) == MAX_RETRIES
     assert len(requests) == MAX_RETRIES + 1  # The first try plus one per retry.
+
+
+def test_get_waits_a_minute_for_secondary_limit_without_retry_after():
+    slept = []
+    body = {"message": "You have exceeded a secondary rate limit. Please wait a few minutes."}
+    headers = {"X-RateLimit-Remaining": "4000"}  # Hourly budget is fine; no Retry-After.
+    handler = replies(httpx.Response(403, json=body, headers=headers), httpx.Response(200, json={}))
+
+    get(fake_client(handler), "/repos/o/r", sleep=slept.append)
+
+    assert slept == [SECONDARY_LIMIT_WAIT]
+
+
+def test_get_does_not_retry_plain_403():
+    slept, requests = [], []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        body = {"message": "Resource not accessible by integration"}
+        return httpx.Response(403, json=body, headers={"X-RateLimit-Remaining": "4000"})
+
+    with pytest.raises(httpx.HTTPStatusError):  # Not a RateLimitError.
+        get(fake_client(handler), "/repos/o/r", sleep=slept.append)
+
+    assert slept == []
+    assert len(requests) == 1
 
 
 def test_redirects_are_followed(settings_env):
