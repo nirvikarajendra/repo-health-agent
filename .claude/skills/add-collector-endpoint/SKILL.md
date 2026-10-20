@@ -17,12 +17,12 @@ Read [fields.md](fields.md) and the table in `sql/migrations/`. Store only the l
 If `tests/fixtures/github/<name>.json` exists, use it instead. Otherwise fetch 5 items **without a token** (never read `.env`), and only replace the fixture if it worked:
 ```bash
 curl -sf -H "X-GitHub-Api-Version: <API_VERSION in collector/github.py>" \
-  "https://api.github.com/<endpoint>?per_page=5" | uv run python -m json.tool > /tmp/<name>.json \
+  "https://api.github.com/repos/<owner>/<repo>/<endpoint>?per_page=5" | uv run python -m json.tool > /tmp/<name>.json \
   && mv /tmp/<name>.json tests/fixtures/github/<name>.json
 ```
 If rate-limited, ask the user to run it in their own terminal with their token (never ask them to share it).
 
-Either way, remove free text (`body`, `title`) from the fixture.
+Either way, remove free-text fields (`body`, `title`, `name`, `commit.message`) from the fixture.
 
 **Checkpoint:** show the field names.
 
