@@ -22,9 +22,10 @@ def load_fixture():
 
 
 class FakeConnection:
-    """Record executemany calls instead of writing to Postgres.
+    """Records each executemany call instead of writing to Postgres.
 
-    Fails if a row has no key for a `%(name)s` placeholder in the SQL.
+    It also checks that every `%(name)s` placeholder in the SQL has a matching key in
+    each row, which is the mistake real Postgres would otherwise catch first.
     """
 
     def __init__(self):
@@ -43,6 +44,9 @@ class FakeConnection:
     def __exit__(self, *args):
         return False
 
+    def execute(self, sql, row):
+        self.executemany(sql, [row])
+
     def executemany(self, sql, rows):
         rows = list(rows)
         needed = set(PLACEHOLDER.findall(sql))
@@ -59,15 +63,10 @@ def fake_conn() -> FakeConnection:
 
 @pytest.fixture
 def fake_github():
-    """Return a builder for an httpx client that serves canned GitHub responses.
+    """Build a fake GitHub client from routes: (path, params, page1, page2, ...).
 
-    Each route is (path, params, page1, page2, ...). A request matches when its path and
-    query params, excluding `per_page` and `page`, equal the route's. Param values must
-    be strings, e.g. {"since": SINCE, "direction": "desc"}.
-
-    Routes with several pages return a `Link: rel="next"` header, as GitHub does.
-    Unmatched requests return a 404 that lists the known routes.
-    """
+    Params must match exactly (ignoring per_page and page), with string values.
+    Extra pages get a `next` link; an unknown request gets a 404."""
 
     def build(routes: list[tuple]) -> httpx.Client:
         def handler(request: httpx.Request) -> httpx.Response:
@@ -76,8 +75,10 @@ def fake_github():
             page = int(params.pop("page", "1"))
             for path, expected, *pages in routes:
                 if request.url.path == path and params == expected:
+                    pages = pages or [[]]  # no pages given: one empty page
                     if page > len(pages):
-                        break
+                        message = f"{path} has only {len(pages)} page(s), got page={page}"
+                        return httpx.Response(404, json={"message": message})
                     headers = {}
                     if page < len(pages):
                         next_url = request.url.copy_set_param("page", page + 1)
