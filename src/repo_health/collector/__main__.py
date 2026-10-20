@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 from repo_health.collector.github import make_client
 from repo_health.collector.issues import collect_comments, collect_issues
 from repo_health.collector.pulls import collect_pulls
+from repo_health.collector.releases import collect_releases
 from repo_health.collector.repos import collect_repo
 from repo_health.db import connect
 
@@ -38,6 +39,10 @@ def main() -> None:
         n = collect_pulls(conn, client, repo["id"], full_name, since)
         conn.commit()
         print(f"Saved {n} pull requests (all open + closed updated in the last {WINDOW_DAYS} days)")
+
+        n = collect_releases(conn, client, repo["id"], full_name)
+        conn.commit()
+        print(f"Saved {n} releases")
 
 
 if __name__ == "__main__":
