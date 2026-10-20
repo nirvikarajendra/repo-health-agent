@@ -17,6 +17,7 @@ from repo_health.collector.pulls import collect_pulls
 from repo_health.collector.releases import collect_releases
 from repo_health.collector.repos import collect_repo
 from repo_health.collector.reviews import SELECT_PR_NUMBERS, collect_reviews
+from repo_health.collector.sync_runs import finish_run, start_run
 from repo_health.db import connect
 from repo_health.logs import setup_logging
 
@@ -69,16 +70,30 @@ def main() -> None:
     since = (datetime.now(UTC) - timedelta(days=WINDOW_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     failed: list[str] = []
+    requests_used = 0
+
+    def count_request(request: httpx.Request) -> None:
+        nonlocal requests_used
+        requests_used += 1
+
     with connect() as conn, make_client() as client:
+        client.event_hooks["request"].append(count_request)
         for full_name in full_names:
             log.info("Collecting %s", full_name)
+            requests_used = 0
+            run_id = start_run(conn, full_name)
             try:
                 collect_one(conn, client, full_name, since)
-            except Exception:
+            except Exception as error:
                 # Drop the failed step's uncommitted rows so the next repo starts clean.
                 conn.rollback()
                 log.exception("Failed %s", full_name)
+                finish_run(
+                    conn, run_id, "failed", requests_used, error=f"{type(error).__name__}: {error}"
+                )
                 failed.append(full_name)
+            else:
+                finish_run(conn, run_id, "success", requests_used)
 
     if failed:
         log.error("%d of %d repos failed: %s", len(failed), len(full_names), ", ".join(failed))
