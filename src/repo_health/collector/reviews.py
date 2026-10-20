@@ -1,9 +1,13 @@
 """Collect pull request reviews (who reviewed, the verdict and when)."""
 
+import logging
+
 import httpx
 import psycopg
 
 from repo_health.collector.github import iter_pages
+
+log = logging.getLogger(__name__)
 
 # PRs the pulls step fetched in this run: all open, plus those updated since `since`.
 # Rows from earlier runs stay in `pull_requests`, so filter on this run's window.
@@ -57,11 +61,13 @@ def collect_reviews(
     GitHub has no repo-wide reviews endpoint, so this makes at least one request per PR.
     """
     seen: set[int] = set()
-    for pr_number in pr_numbers:
+    for done, pr_number in enumerate(pr_numbers, start=1):
         for page in iter_pages(client, f"/repos/{full_name}/pulls/{pr_number}/reviews", {}):
             rows = [parse_review(item, pr_number) | {"repo_id": repo_id} for item in page]
             if rows:  # A PR with no reviews yields one empty page.
                 with conn.cursor() as cur:
                     cur.executemany(UPSERT_REVIEW, rows)
             seen.update(row["id"] for row in rows)
+        if done % 100 == 0:
+            log.info("reviews: %d/%d PRs", done, len(pr_numbers))
     return len(seen)

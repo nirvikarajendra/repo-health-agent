@@ -1,9 +1,14 @@
+import time
+
 import httpx
 import pytest
 
 from repo_health.collector.github import (
     API_VERSION,
+    MAX_RETRIES,
+    SECONDARY_LIMIT_WAIT,
     RateLimitError,
+    get,
     get_json,
     iter_pages,
     make_client,
@@ -44,13 +49,76 @@ def test_get_json_raises_on_error_status():
         get_json(client, "/repos/encode/httpx")
 
 
-def test_rate_limit_raises_clear_error():
+def replies(*responses: httpx.Response):
+    """A handler that returns `responses` in order, one per request."""
+    queue = iter(responses)
+    return lambda request: next(queue)
+
+
+def test_get_waits_for_retry_after_then_succeeds():
+    slept = []
+    handler = replies(
+        httpx.Response(429, headers={"Retry-After": "2"}),
+        httpx.Response(200, json={"ok": True}),
+    )
+
+    response = get(fake_client(handler), "/repos/o/r", sleep=slept.append)
+
+    assert response.json() == {"ok": True}
+    assert slept == [2]
+
+
+def test_get_waits_until_hourly_reset_then_succeeds():
+    slept = []
+    reset = int(time.time()) + 60
+    headers = {"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": str(reset)}
+    handler = replies(httpx.Response(403, headers=headers), httpx.Response(200, json={}))
+
+    get(fake_client(handler), "/repos/o/r", sleep=slept.append)
+
+    assert len(slept) == 1
+    assert slept[0] == pytest.approx(61, abs=2)  # reset - now + 1 second.
+
+
+def test_get_raises_rate_limit_error_after_max_retries():
+    slept, requests = [], []
+    headers = {"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": "1760000000"}
+
     def handler(request: httpx.Request) -> httpx.Response:
-        headers = {"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": "1760000000"}
+        requests.append(request)
         return httpx.Response(403, json={"message": "rate limit"}, headers=headers)
 
     with pytest.raises(RateLimitError, match="resets at"):
-        get_json(fake_client(handler), "/repos/encode/httpx")
+        get(fake_client(handler), "/repos/o/r", sleep=slept.append)
+
+    assert len(slept) == MAX_RETRIES
+    assert len(requests) == MAX_RETRIES + 1  # The first try plus one per retry.
+
+
+def test_get_waits_a_minute_for_secondary_limit_without_retry_after():
+    slept = []
+    body = {"message": "You have exceeded a secondary rate limit. Please wait a few minutes."}
+    headers = {"X-RateLimit-Remaining": "4000"}  # Hourly budget is fine; no Retry-After.
+    handler = replies(httpx.Response(403, json=body, headers=headers), httpx.Response(200, json={}))
+
+    get(fake_client(handler), "/repos/o/r", sleep=slept.append)
+
+    assert slept == [SECONDARY_LIMIT_WAIT]
+
+
+def test_get_does_not_retry_plain_403():
+    slept, requests = [], []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        body = {"message": "Resource not accessible by integration"}
+        return httpx.Response(403, json=body, headers={"X-RateLimit-Remaining": "4000"})
+
+    with pytest.raises(httpx.HTTPStatusError):  # Not a RateLimitError.
+        get(fake_client(handler), "/repos/o/r", sleep=slept.append)
+
+    assert slept == []
+    assert len(requests) == 1
 
 
 def test_redirects_are_followed(settings_env):

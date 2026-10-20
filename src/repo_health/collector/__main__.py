@@ -3,6 +3,7 @@
 Run with: uv run python -m repo_health.collector encode/httpx [OWNER/REPO ...]
 """
 
+import logging
 import sys
 from datetime import UTC, datetime, timedelta
 
@@ -17,8 +18,11 @@ from repo_health.collector.releases import collect_releases
 from repo_health.collector.repos import collect_repo
 from repo_health.collector.reviews import SELECT_PR_NUMBERS, collect_reviews
 from repo_health.db import connect
+from repo_health.logs import setup_logging
 
 WINDOW_DAYS = 365
+
+log = logging.getLogger(__name__)
 
 
 def collect_one(conn: psycopg.Connection, client: httpx.Client, full_name: str, since: str) -> None:
@@ -26,36 +30,39 @@ def collect_one(conn: psycopg.Connection, client: httpx.Client, full_name: str, 
     # Commit after each step so a failure later (e.g. rate limit) keeps finished work.
     repo = collect_repo(conn, client, full_name)
     conn.commit()
-    print(f"Saved {repo['full_name']}: {repo['stars']} stars")
+    log.info("Saved %s: %d stars", repo["full_name"], repo["stars"])
 
     n = collect_issues(conn, client, repo["id"], full_name, since)
     conn.commit()
-    print(f"Saved {n} issues and PRs (all open + updated in the last {WINDOW_DAYS} days)")
+    log.info("Saved %d issues and PRs (all open + updated in the last %d days)", n, WINDOW_DAYS)
 
     n = collect_comments(conn, client, repo["id"], full_name, since)
     conn.commit()
-    print(f"Saved {n} comments")
+    log.info("Saved %d comments", n)
 
     n = collect_pulls(conn, client, repo["id"], full_name, since)
     conn.commit()
-    print(f"Saved {n} pull requests (all open + closed updated in the last {WINDOW_DAYS} days)")
+    log.info(
+        "Saved %d pull requests (all open + closed updated in the last %d days)", n, WINDOW_DAYS
+    )
 
     params = {"repo_id": repo["id"], "since": since}
     pr_numbers = [row[0] for row in conn.execute(SELECT_PR_NUMBERS, params)]
     n = collect_reviews(conn, client, repo["id"], full_name, pr_numbers)
     conn.commit()
-    print(f"Saved {n} reviews on {len(pr_numbers)} pull requests")
+    log.info("Saved %d reviews on %d pull requests", n, len(pr_numbers))
 
     n = collect_releases(conn, client, repo["id"], full_name)
     conn.commit()
-    print(f"Saved {n} releases")
+    log.info("Saved %d releases", n)
 
     n = collect_commits(conn, client, repo["id"], full_name, since)
     conn.commit()
-    print(f"Saved {n} commits from the last {WINDOW_DAYS} days")
+    log.info("Saved %d commits from the last %d days", n, WINDOW_DAYS)
 
 
 def main() -> None:
+    setup_logging()
     full_names = sys.argv[1:]
     if not full_names:
         sys.exit("Usage: python -m repo_health.collector OWNER/REPO [OWNER/REPO ...]")
@@ -64,17 +71,17 @@ def main() -> None:
     failed: list[str] = []
     with connect() as conn, make_client() as client:
         for full_name in full_names:
-            print(f"== {full_name}")
+            log.info("Collecting %s", full_name)
             try:
                 collect_one(conn, client, full_name, since)
-            except Exception as error:
+            except Exception:
                 # Drop the failed step's uncommitted rows so the next repo starts clean.
                 conn.rollback()
-                print(f"Failed {full_name}: {type(error).__name__}: {error}", file=sys.stderr)
+                log.exception("Failed %s", full_name)
                 failed.append(full_name)
 
     if failed:
-        print(f"{len(failed)} of {len(full_names)} repos failed: {', '.join(failed)}")
+        log.error("%d of %d repos failed: %s", len(failed), len(full_names), ", ".join(failed))
         sys.exit(1)
 
 
