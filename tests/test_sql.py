@@ -66,6 +66,54 @@ def test_sync_runs_record_outcome_and_github_name(db_conn):
     ]
 
 
+def test_successful_run_links_to_saved_repo(db_conn, repo_id):
+    run = start_run(db_conn, "Encode/HTTPX")
+    finish_run(db_conn, run, "success", 42, full_name="encode/httpx")
+
+    row = db_conn.execute(
+        "SELECT repo_id, repo_full_name FROM sync_runs WHERE id = %s", (run,)
+    ).fetchone()
+
+    assert row == (repo_id, "encode/httpx")
+
+
+def test_run_links_to_newest_repo_when_names_differ_only_by_case(db_conn, repo_id, load_fixture):
+    stale = parse_repo(load_fixture("repo.json"), load_fixture("community_profile.json")) | {
+        "id": 1,
+        "full_name": "ENCODE/HTTPX",
+        "snapshot_at": "2020-01-01T00:00:00Z",
+    }
+    upsert_repo(db_conn, stale)
+    run = start_run(db_conn, "encode/httpx")
+    finish_run(db_conn, run, "failed", 1, error="RuntimeError: boom")  # Used to raise here.
+
+    row = db_conn.execute("SELECT repo_id FROM sync_runs WHERE id = %s", (run,)).fetchone()
+
+    assert row == (repo_id,)  # The fixture's row is newer than the stale one.
+
+
+def test_failed_run_links_to_saved_repo_with_github_name(db_conn, repo_id):
+    run = start_run(db_conn, "Encode/HTTPX")
+    finish_run(db_conn, run, "failed", 3, error="RateLimitError: GitHub rate limit reached.")
+
+    row = db_conn.execute(
+        "SELECT repo_id, repo_full_name FROM sync_runs WHERE id = %s", (run,)
+    ).fetchone()
+
+    assert row == (repo_id, "encode/httpx")  # Matched ignoring case; GitHub's spelling stored.
+
+
+def test_failed_run_without_saved_repo_keeps_typed_name(db_conn):
+    run = start_run(db_conn, "encode/does-not-exist")
+    finish_run(db_conn, run, "failed", 1, error="HTTPStatusError: 404 Not Found")
+
+    row = db_conn.execute(
+        "SELECT repo_id, repo_full_name FROM sync_runs WHERE id = %s", (run,)
+    ).fetchone()
+
+    assert row == (None, "encode/does-not-exist")
+
+
 def test_release_upsert_updates_a_draft_once_published(db_conn, repo_id, load_fixture):
     release = parse_release(load_fixture("releases.json")[0]) | {"repo_id": repo_id}
 
