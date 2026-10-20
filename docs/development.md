@@ -65,6 +65,7 @@ All settings come from environment variables in `.env`. The file is git-ignored,
 |---|---|
 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Local database |
 | `DATABASE_URL` | Connection string the app and migrations use to reach Postgres |
+| `TEST_DATABASE_URL` | Test database for `tests/test_sql.py`; name must end in `_test` (wiped by every test). Unset: those tests are skipped |
 | `GITHUB_TOKEN` | Fine-grained, read-only token for public repos |
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | LLM access (free tier) |
 
