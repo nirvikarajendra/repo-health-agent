@@ -25,7 +25,7 @@ Full design: @docs/architecture.md. Read it before changing data, tables, metric
 - Lint/format: `uv run ruff check . --fix && uv run ruff format .`
 - Lint/format check only (no changes): `uv run ruff check . && uv run ruff format --check .`
 - Apply DB migrations: `uv run python -m repo_health.migrate`
-- Collect one repo into Postgres: `uv run python -m repo_health.collector OWNER/REPO`
+- Collect repos into Postgres: `uv run python -m repo_health.collector OWNER/REPO [OWNER/REPO ...]` (a failed repo is skipped; exit code 1 if any failed)
 
 ## Layout
 - `pyproject.toml`: project metadata, dev dependencies (pytest, ruff), ruff config
