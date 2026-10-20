@@ -1,0 +1,47 @@
+[
+    {
+        "id": 5186132073,
+        "user": {
+            "login": "imbdb"
+        },
+        "author_association": "NONE",
+        "state": "APPROVED",
+        "submitted_at": "2026-09-12T10:20:06Z"
+    },
+    {
+        "id": 5186194382,
+        "user": {
+            "login": "imbdb"
+        },
+        "author_association": "NONE",
+        "state": "COMMENTED",
+        "submitted_at": "2026-09-12T10:51:10Z"
+    },
+    {
+        "id": 5186195471,
+        "user": {
+            "login": "imbdb"
+        },
+        "author_association": "NONE",
+        "state": "CHANGES_REQUESTED",
+        "submitted_at": "2026-09-12T10:51:25Z"
+    },
+    {
+        "id": 5220040423,
+        "user": {
+            "login": "kajinamit"
+        },
+        "author_association": "NONE",
+        "state": "COMMENTED",
+        "submitted_at": "2026-09-16T08:00:08Z"
+    },
+    {
+        "id": 5251602212,
+        "user": {
+            "login": "motaharevadiaty-design"
+        },
+        "author_association": "NONE",
+        "state": "COMMENTED",
+        "submitted_at": "2026-09-18T19:09:13Z"
+    }
+]
