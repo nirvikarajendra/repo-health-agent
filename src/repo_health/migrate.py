@@ -33,6 +33,7 @@ def apply_migrations(conn: psycopg.Connection) -> None:
     )
     rows = conn.execute("SELECT filename FROM schema_migrations")
     applied = {row[0] for row in rows}
+    conn.commit()  # End the implicit transaction, so each file below gets its own.
     todo = pending_migrations(list(MIGRATIONS_DIR.glob("*.sql")), applied)
     if not todo:
         log.info("Database is up to date.")

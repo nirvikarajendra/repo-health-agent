@@ -10,8 +10,9 @@
 git clone https://github.com/<you>/repo-health-agent.git
 cd repo-health-agent
 uv sync                                   # install dependencies from uv.lock
-cp .env.example .env                      # then set POSTGRES_PASSWORD (and the same password in DATABASE_URL)
+cp .env.example .env                      # then set POSTGRES_PASSWORD (and the same password in both *_URL lines)
 docker compose up -d                      # start Postgres
+docker compose exec db createdb -U repo_health repo_health_test   # once, for tests/test_sql.py
 uv run python -m repo_health.migrate      # apply DB migrations
 uv run pytest                             # run tests
 uv run python -m repo_health.collector encode/httpx   # collect one or more OWNER/REPO into Postgres

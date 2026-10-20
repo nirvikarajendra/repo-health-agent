@@ -13,7 +13,7 @@ Full design: @docs/architecture.md. Read it before changing data, tables, metric
 ## Stack (don't change without asking)
 - Python 3.12, managed with **uv** (`uv add`, `uv run`). Never use pip directly.
 - Google ADK + Gemini (free tier, model name comes from config, never hard-coded)
-- Postgres 16 in Docker Compose; `psycopg` v3; plain SQL (no ORM)
+- Postgres 18 (pgvector image `pgvector/pgvector:0.8.7-pg18`) in Docker Compose and CI; `psycopg` v3; plain SQL (no ORM)
 - Pydantic v2 for every tool input/output
 - pytest, ruff (lint + format), GitHub Actions
 - Free and free-tier only. Ask before adding anything that costs money.
