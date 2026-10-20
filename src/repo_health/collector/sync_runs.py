@@ -8,13 +8,24 @@ VALUES (%(full_name)s, 'running')
 RETURNING id
 """
 
+# Link the run to its repo (GitHub's name, else the typed name, any case);
+# no repo saved -> repo_id NULL. If names differ only by case, the newest snapshot wins.
 FINISH_RUN = """
+WITH repo AS (
+    SELECT r.id, r.full_name
+    FROM sync_runs s
+    JOIN repos r ON lower(r.full_name) = lower(COALESCE(%(full_name)s, s.repo_full_name))
+    WHERE s.id = %(run_id)s
+    ORDER BY r.snapshot_at DESC
+    LIMIT 1
+)
 UPDATE sync_runs
 SET status = %(status)s,
     finished_at = now(),
     requests_used = %(requests_used)s,
     error = %(error)s,
-    repo_full_name = COALESCE(%(full_name)s, repo_full_name)
+    repo_id = (SELECT id FROM repo),
+    repo_full_name = COALESCE((SELECT full_name FROM repo), %(full_name)s, repo_full_name)
 WHERE id = %(run_id)s
 """
 
