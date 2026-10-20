@@ -48,6 +48,7 @@ def test_collect_issues_includes_old_open_issues_and_counts_each_once(
     n = collect_issues(fake_conn, client, repo_id=42, full_name="o/r", since=SINCE)
 
     assert n == 2  # Issue 1 is counted once.
+    assert fake_conn.commits == 3  # One per page with rows.
     assert {row["number"] for row in fake_conn.rows} == {1, 2}
     assert all(row["repo_id"] == 42 for row in fake_conn.rows)
     assert all(row["state"] is not None for row in fake_conn.rows)  # NOT NULL in the schema.
@@ -55,9 +56,12 @@ def test_collect_issues_includes_old_open_issues_and_counts_each_once(
 
 def test_collect_comments_saves_parsed_rows(fake_conn, fake_github, load_fixture):
     comments = load_fixture("issue_comments.json")
-    client = fake_github([("/repos/o/r/issues/comments", {"since": SINCE}, comments)])
+    client = fake_github(
+        [("/repos/o/r/issues/comments", {"since": SINCE}, comments[:2], comments[2:])]
+    )
 
     n = collect_comments(fake_conn, client, repo_id=42, full_name="o/r", since=SINCE)
 
     assert n == len(comments)
+    assert fake_conn.commits == 2  # One per page with rows.
     assert all(row["repo_id"] == 42 and "issue_number" in row for row in fake_conn.rows)

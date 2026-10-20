@@ -27,7 +27,8 @@ log = logging.getLogger(__name__)
 
 def collect_one(conn: psycopg.Connection, client: httpx.Client, full_name: str, since: str) -> None:
     """Run every collector step for one repo."""
-    # Commit after each step so a failure later (e.g. rate limit) keeps finished work.
+    # Collectors commit after each page, so a crash loses at most one page.
+    # The commit after each step also saves collect_repo, which has no pages.
     repo = collect_repo(conn, client, full_name)
     conn.commit()
     log.info("Saved %s: %d stars", repo["full_name"], repo["stars"])
@@ -75,7 +76,7 @@ def main() -> None:
             try:
                 collect_one(conn, client, full_name, since)
             except Exception:
-                # Drop the failed step's uncommitted rows so the next repo starts clean.
+                # Drop the failed page's uncommitted rows so the next repo starts clean.
                 conn.rollback()
                 log.exception("Failed %s", full_name)
                 failed.append(full_name)

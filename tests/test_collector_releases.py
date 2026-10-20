@@ -29,6 +29,7 @@ def test_collect_releases_saves_every_page(load_fixture, fake_conn, fake_github)
 
     assert {row["id"] for row in fake_conn.rows} == {r["id"] for r in releases}
     assert n == len(releases)
+    assert fake_conn.commits == 2  # One per page with rows.
     assert all(row["repo_id"] == 42 for row in fake_conn.rows)
     assert all(
         row["tag"] is not None and row["is_prerelease"] is not None and row["is_draft"] is not None

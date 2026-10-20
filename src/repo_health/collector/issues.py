@@ -83,8 +83,10 @@ def collect_issues(
     for params in queries:
         for page in iter_pages(client, f"/repos/{full_name}/issues", params):
             rows = [parse_issue(item) | {"repo_id": repo_id} for item in page]
-            with conn.cursor() as cur:
-                cur.executemany(UPSERT_ISSUE, rows)
+            if rows:
+                with conn.cursor() as cur:
+                    cur.executemany(UPSERT_ISSUE, rows)
+                conn.commit()  # Save each page, so a crash loses at most one.
             seen.update(row["number"] for row in rows)
     return len(seen)
 
@@ -101,7 +103,9 @@ def collect_comments(
     path = f"/repos/{full_name}/issues/comments"
     for page in iter_pages(client, path, {"since": since}):
         rows = [parse_comment(item) | {"repo_id": repo_id} for item in page]
-        with conn.cursor() as cur:
-            cur.executemany(UPSERT_COMMENT, rows)
+        if rows:
+            with conn.cursor() as cur:
+                cur.executemany(UPSERT_COMMENT, rows)
+            conn.commit()  # Save each page, so a crash loses at most one.
         seen.update(row["id"] for row in rows)
     return len(seen)

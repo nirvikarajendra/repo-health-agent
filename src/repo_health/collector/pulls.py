@@ -31,6 +31,7 @@ def upsert_pulls(conn: psycopg.Connection, repo_id: int, items: list[dict]) -> s
     if rows:
         with conn.cursor() as cur:
             cur.executemany(UPSERT_PULL, rows)
+        conn.commit()  # Save each page, so a crash loses at most one.
     return {row["number"] for row in rows}
 
 

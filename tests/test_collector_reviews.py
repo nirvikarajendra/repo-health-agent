@@ -31,6 +31,7 @@ def test_collect_reviews_saves_every_page_with_its_pr_number(load_fixture, fake_
     pr_of = {row["id"]: row["pr_number"] for row in fake_conn.rows}
     assert pr_of == {r["id"]: 1 for r in reviews[:4]} | {reviews[4]["id"]: 2}
     assert n == len(reviews)
+    assert fake_conn.commits == 3  # PR 1: two pages, PR 2: one.
     assert all(row["repo_id"] == 42 for row in fake_conn.rows)
     assert all(
         row["author_association"] is not None and row["state"] is not None for row in fake_conn.rows

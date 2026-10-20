@@ -24,6 +24,7 @@ def test_collect_commits_saves_every_page(load_fixture, fake_conn, fake_github):
 
     assert {row["sha"] for row in fake_conn.rows} == {c["sha"] for c in commits}
     assert n == len(commits)
+    assert fake_conn.commits == 2  # One per page with rows.
     assert all(row["repo_id"] == 42 for row in fake_conn.rows)
     assert all(
         row["sha"] is not None and row["committed_at"] is not None for row in fake_conn.rows

@@ -38,7 +38,9 @@ def collect_commits(
     seen: set[str] = set()
     for page in iter_pages(client, f"/repos/{full_name}/commits", {"since": since}):
         rows = [parse_commit(item) | {"repo_id": repo_id} for item in page]
-        with conn.cursor() as cur:
-            cur.executemany(UPSERT_COMMIT, rows)
+        if rows:
+            with conn.cursor() as cur:
+                cur.executemany(UPSERT_COMMIT, rows)
+            conn.commit()  # Save each page, so a crash loses at most one.
         seen.update(row["sha"] for row in rows)
     return len(seen)

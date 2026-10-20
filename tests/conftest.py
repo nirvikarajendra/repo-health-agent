@@ -22,7 +22,7 @@ def load_fixture():
 
 
 class FakeConnection:
-    """Records each executemany call instead of writing to Postgres.
+    """Records each executemany call and counts commits instead of writing to Postgres.
 
     It also checks that every `%(name)s` placeholder in the SQL has a matching key in
     each row, which is the mistake real Postgres would otherwise catch first.
@@ -30,10 +30,14 @@ class FakeConnection:
 
     def __init__(self):
         self.calls: list[tuple[str, list[dict]]] = []
+        self.commits = 0
 
     @property
     def rows(self) -> list[dict]:
         return [row for _, rows in self.calls for row in rows]
+
+    def commit(self):
+        self.commits += 1
 
     def cursor(self):
         return self

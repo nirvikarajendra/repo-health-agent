@@ -42,7 +42,9 @@ def collect_releases(
     seen: set[int] = set()
     for page in iter_pages(client, f"/repos/{full_name}/releases", {}):
         rows = [parse_release(item) | {"repo_id": repo_id} for item in page]
-        with conn.cursor() as cur:
-            cur.executemany(UPSERT_RELEASE, rows)
+        if rows:
+            with conn.cursor() as cur:
+                cur.executemany(UPSERT_RELEASE, rows)
+            conn.commit()  # Save each page, so a crash loses at most one.
         seen.update(row["id"] for row in rows)
     return len(seen)

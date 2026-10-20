@@ -47,6 +47,7 @@ def test_collect_pulls_stops_paging_at_first_old_closed_pr(load_fixture, fake_co
     assert 2 not in saved  # Older than `since`.
     assert 3 not in saved  # On page 2, which is never fetched.
     assert n == 4
+    assert fake_conn.commits == 2  # Open page + closed page 1.
     assert all(row["repo_id"] == 42 for row in fake_conn.rows)
     assert all(
         row["base_ref"] is not None and row["is_draft"] is not None for row in fake_conn.rows

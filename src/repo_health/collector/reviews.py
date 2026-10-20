@@ -67,6 +67,7 @@ def collect_reviews(
             if rows:  # A PR with no reviews yields one empty page.
                 with conn.cursor() as cur:
                     cur.executemany(UPSERT_REVIEW, rows)
+                conn.commit()  # Save each page, so a crash loses at most one.
             seen.update(row["id"] for row in rows)
         if done % 100 == 0:
             log.info("reviews: %d/%d PRs", done, len(pr_numbers))
