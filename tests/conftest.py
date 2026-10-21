@@ -9,6 +9,7 @@ import psycopg
 import pytest
 from psycopg.conninfo import conninfo_to_dict
 
+from repo_health.collector.repos import parse_repo, upsert_repo
 from repo_health.config import get_settings
 from repo_health.migrate import apply_migrations
 
@@ -130,3 +131,11 @@ def db_conn(migrated_db_url):
         conn.commit()
         yield conn
         conn.rollback()  # Discard anything the test didn't commit itself.
+
+
+@pytest.fixture
+def repo_id(db_conn, load_fixture) -> int:
+    """Save the encode/httpx repo row, which every data table references."""
+    row = parse_repo(load_fixture("repo.json"), load_fixture("community_profile.json"))
+    upsert_repo(db_conn, row)
+    return row["id"]
