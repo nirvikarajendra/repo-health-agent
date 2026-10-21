@@ -106,6 +106,15 @@ def test_get_waits_a_minute_for_secondary_limit_without_retry_after():
     assert slept == [SECONDARY_LIMIT_WAIT]
 
 
+def test_get_waits_a_minute_for_bare_429():
+    slept = []
+    handler = replies(httpx.Response(429, text="Too Many Requests"), httpx.Response(200, json={}))
+
+    get(fake_client(handler), "/repos/o/r", sleep=slept.append)
+
+    assert slept == [SECONDARY_LIMIT_WAIT]
+
+
 def test_get_does_not_retry_plain_403():
     slept, requests = [], []
 

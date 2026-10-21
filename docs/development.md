@@ -31,7 +31,8 @@ src/repo_health/
 logs/            run logs, one file per day (YYYY-MM-DD.log); git-ignored
 sql/migrations/  numbered schema files; add new ones, never edit applied ones
 tests/           unit tests (no network, no real LLM calls)
-  conftest.py    shared fixtures: load_fixture, fake_conn, fake_github
+  conftest.py    shared fixtures: load_fixture, fake_conn, fake_github, db_conn (real test DB)
+  test_sql.py    real SQL against TEST_DATABASE_URL (name must end in _test)
   fixtures/      trimmed real GitHub API responses
 docs/            architecture and development docs
 .claude/         Claude Code settings, hooks and skills
@@ -83,6 +84,6 @@ All settings come from environment variables in `.env`. The file is git-ignored,
 |---|---|
 | uv instead of pip/venv | One tool for Python versions, dependencies and lock file; fast and reproducible |
 | Plain parameterised SQL, no ORM | Metrics are analytical queries (medians, window functions); the SQL is the metric definition |
-| Postgres with pgvector image | Same database supports vector search for the planned issue-summariser agent |
+| Postgres with pgvector image | Not used in v1; kept for the planned issue-summariser agent (vector search over issue text) |
 | Fixed metric tools instead of LLM-written SQL | Deterministic, testable numbers; the agent can't run arbitrary queries |
 | Data snapshot in Postgres | Repeatable answers for evals; no rate-limit pressure at question time |

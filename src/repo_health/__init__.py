@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from repo-health!")
+"""repo-health-agent: is this open-source library well maintained?"""
