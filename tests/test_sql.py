@@ -1,7 +1,5 @@
 """SQL tests against a real Postgres (TEST_DATABASE_URL). Skipped when it isn't set."""
 
-import pytest
-
 from repo_health.collector.issues import UPSERT_ISSUE, parse_issue
 from repo_health.collector.pulls import UPSERT_PULL, parse_pull
 from repo_health.collector.releases import UPSERT_RELEASE, parse_release
@@ -10,14 +8,6 @@ from repo_health.collector.reviews import SELECT_PR_NUMBERS
 from repo_health.collector.sync_runs import finish_run, start_run
 
 SINCE = "2025-10-20T00:00:00Z"
-
-
-@pytest.fixture
-def repo_id(db_conn, load_fixture) -> int:
-    """Save the encode/httpx repo row, which every data table references."""
-    row = parse_repo(load_fixture("repo.json"), load_fixture("community_profile.json"))
-    upsert_repo(db_conn, row)
-    return row["id"]
 
 
 def test_issue_upsert_twice_keeps_one_row_with_the_new_value(db_conn, repo_id, load_fixture):

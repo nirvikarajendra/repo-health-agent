@@ -31,7 +31,7 @@ One agent: the **Maintenance Health agent**.
 
 | Tool | Answers |
 |---|---|
-| `list_repos` | which repos are tracked, and the snapshot date |
+| `list_repos` | which repos are tracked, and when their data was last fully collected |
 | `get_repo_overview` | general repo stats |
 | `get_first_response_time` | how fast maintainers reply to new issues |
 | `get_bug_close_rate` | share of bugs closed within 30 days |

@@ -13,7 +13,7 @@ jobs:
   lint-and-test:                
     runs-on: ubuntu-latest       
     services:
-      postgres:                    # Throwaway database for tests/test_sql.py
+      postgres:                    # Throwaway database for the real-Postgres tests
         image: pgvector/pgvector:0.8.7-pg18   
         env:
           POSTGRES_USER: test
