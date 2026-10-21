@@ -81,9 +81,10 @@ def test_run_links_to_newest_repo_when_names_differ_only_by_case(db_conn, repo_i
     stale = parse_repo(load_fixture("repo.json"), load_fixture("community_profile.json")) | {
         "id": 1,
         "full_name": "ENCODE/HTTPX",
-        "snapshot_at": "2020-01-01T00:00:00Z",
     }
     upsert_repo(db_conn, stale)
+    # UPSERT_REPO always stores now(), so make the stale row older by hand.
+    db_conn.execute("UPDATE repos SET snapshot_at = '2020-01-01T00:00:00Z' WHERE id = 1")
     run = start_run(db_conn, "encode/httpx")
     finish_run(db_conn, run, "failed", 1, error="RuntimeError: boom")  # Used to raise here.
 

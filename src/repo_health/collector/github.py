@@ -51,6 +51,8 @@ def rate_limit_wait(response: httpx.Response) -> tuple[float, str] | None:
     # GitHub's docs: a secondary limit without either header means wait at least a minute.
     if "secondary rate limit" in response.text.lower():
         return SECONDARY_LIMIT_WAIT, "secondary rate limit"
+    if response.status_code == 429:  # "Too Many Requests" is a rate limit even with no hints.
+        return SECONDARY_LIMIT_WAIT, "429 Too Many Requests"
     return None  # A plain 403, e.g. no permission: not worth retrying.
 
 
