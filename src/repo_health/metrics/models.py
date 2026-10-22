@@ -11,7 +11,7 @@ DATA_AS_OF = (
 
 
 class Metric(BaseModel):
-    """One computed number, for the metric tools to come."""
+    """One computed number, reserved for the Phase 4 answer format; metric tools don't use it."""
 
     name: str
     value: float | None
