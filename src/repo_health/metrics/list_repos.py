@@ -4,13 +4,12 @@ import psycopg
 
 from repo_health.metrics.models import TrackedRepo
 
-# The success filter is in the JOIN, not a WHERE, so a repo with no successful
-# run is still listed (data_as_of NULL): it may hold partial data from failed runs.
+# data_as_of comes from the repo_data_as_of view (migration 003), shared by every tool.
+# A repo with no successful run is still listed, with data_as_of NULL.
 LIST_REPOS = """
-SELECT r.full_name, max(s.finished_at) AS data_as_of
+SELECT r.full_name, d.data_as_of
 FROM repos r
-LEFT JOIN sync_runs s ON s.repo_id = r.id AND s.status = 'success'
-GROUP BY r.id, r.full_name
+JOIN repo_data_as_of d ON d.repo_id = r.id
 ORDER BY r.full_name
 """
 
