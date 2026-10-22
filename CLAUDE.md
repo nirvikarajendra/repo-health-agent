@@ -42,6 +42,7 @@ Full design: @docs/architecture.md. Read it before changing data, tables, metric
 - `tests/`: unit tests (no network, no real LLM calls). `conftest.py` has the shared fixtures (`load_fixture`, `fake_conn`, `fake_github`); `fixtures/github/` holds trimmed real API responses. `db_conn` connects to `TEST_DATABASE_URL` (its name must end in `_test`; every test empties it, and the tests are skipped if it is unset); `test_sql.py` runs the real SQL against it.
 - `docs/architecture.md`: full design; `docs/development.md`: setup and workflow
 - `.claude/skills/add-collector-endpoint/`: step-by-step recipe for adding a new GitHub endpoint to the collector
+- `.claude/skills/add-metric/`: recipe for adding a metric tool; `definitions.md` holds the exact metric rules
 - Not created yet: `evals/` (questions, code-computed gold answers, eval runner)
 
 ## Rules that matter
