@@ -26,7 +26,7 @@ src/repo_health/
   migrate.py     applies new files from sql/migrations/
   logs.py        setup_logging(): terminal + logs/ file
   collector/     GitHub API → Postgres (plain Python)
-  metrics/       one SQL query + function per metric (list_repos, repo_overview, first_response_time, bug_close_rate so far)
+  metrics/       one SQL query + function per metric (list_repos, repo_overview, first_response_time, bug_close_rate, pr_review_time so far)
   agent/         ADK agent and its tools (not started)
 logs/            run logs, one file per day (YYYY-MM-DD.log); git-ignored
 sql/migrations/  numbered schema files; add new ones, never edit applied ones
