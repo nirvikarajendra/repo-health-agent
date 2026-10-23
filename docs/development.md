@@ -16,6 +16,7 @@ docker compose exec db createdb -U repo_health repo_health_test   # once, for te
 uv run python -m repo_health.migrate      # apply DB migrations
 uv run pytest                             # run tests
 uv run python -m repo_health.collector encode/httpx   # collect one or more OWNER/REPO into Postgres
+uv run adk run src/repo_health/agent       # chat with the agent (calls Gemini)
 ```
 
 ## Project layout
@@ -27,7 +28,7 @@ src/repo_health/
   logs.py        setup_logging(): terminal + logs/ file
   collector/     GitHub API → Postgres (plain Python)
   metrics/       one SQL query + function per metric (list_repos, repo_overview, first_response_time, bug_close_rate, pr_review_time, release_cadence, contributor_stats)
-  agent/         ADK agent and its tools (not started)
+  agent/         ADK agent: tools.py (tool wrappers), build.py (agent + instruction), agent.py (root_agent)
 logs/            run logs, one file per day (YYYY-MM-DD.log); git-ignored
 sql/migrations/  numbered schema files; add new ones, never edit applied ones
 tests/           unit tests (no network, no real LLM calls)
@@ -69,7 +70,7 @@ All settings come from environment variables in `.env`. The file is git-ignored,
 | `DATABASE_URL` | Connection string the app and migrations use to reach Postgres |
 | `TEST_DATABASE_URL` | Test database for `tests/test_sql.py`; name must end in `_test` (wiped by every test). Unset: those tests are skipped |
 | `GITHUB_TOKEN` | Fine-grained, read-only token for public repos |
-| `GEMINI_API_KEY`, `GEMINI_MODEL` | LLM access (free tier) |
+| `GOOGLE_API_KEY`, `GOOGLE_GENAI_USE_VERTEXAI`, `GEMINI_MODEL` | Gemini API access (free tier; `GOOGLE_GENAI_USE_VERTEXAI=FALSE` means the Gemini API, not Vertex AI). `GEMINI_MODEL` is the model name the agent uses; tests never need these |
 
 ## AI-assisted development (Claude Code)
 - `CLAUDE.md`: project rules: stack, layout, coding rules, scope.

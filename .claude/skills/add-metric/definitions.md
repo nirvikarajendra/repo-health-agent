@@ -3,6 +3,7 @@
 Exact definitions for the metric tools. Code follows these; if one is unclear, ask, don't guess.
 
 ## Shared rules
+- Each metric's SQL is self-contained on purpose; keep the rules identical across files.
 - **Window:** every tool takes `days` and covers `(data_as_of - days, data_as_of]`. It ends at `data_as_of`, not `now()`, so the same data always gives the same answer. Ignore rows after `data_as_of`. `days` must be 1–365 (the collector keeps 365 days); check it in Python before running the SQL and raise `ValueError` otherwise.
 - **No complete snapshot:** if `data_as_of` is NULL, return the model with every number `None` and `note = "no complete snapshot"`. An unknown repo returns `None` (no model).
 - **Maintainer:** `author_association IN ('OWNER', 'MEMBER', 'COLLABORATOR')`.
