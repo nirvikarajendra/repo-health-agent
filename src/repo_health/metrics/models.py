@@ -153,3 +153,28 @@ class ReleaseCadence(BaseModel):
     )
     data_as_of: datetime | None = Field(description=DATA_AS_OF)
     note: str | None
+
+
+class ContributorStats(BaseModel):
+    full_name: str
+    days: int = Field(description="Window length in days, ending at data_as_of")
+    active_contributors: int | None = Field(
+        description="Distinct people (not bots) with a commit on the default branch in the window"
+    )
+    authors_for_half_of_commits: int | None = Field(
+        description="Smallest number of people who together made at least 50% of commits_counted; "
+        "1 means one person carries the project"
+    )
+    commits_counted: int | None = Field(
+        description="Default-branch commits in the window by people (not bots) with a linked "
+        "GitHub account: the base for the two numbers above"
+    )
+    bot_commits: int | None = Field(
+        description="Commits by bots in the window, left out of the numbers above"
+    )
+    unattributed_commits: int | None = Field(
+        description="Commits in the window with no linked GitHub account, left out of the "
+        "numbers above"
+    )
+    data_as_of: datetime | None = Field(description=DATA_AS_OF)
+    note: str | None

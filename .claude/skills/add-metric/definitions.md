@@ -52,4 +52,7 @@ Exact definitions for the metric tools. Code follows these; if one is unclear, a
 - **Active contributors:** distinct non-bot `author_login`.
 - **Concentration:** the smallest number of authors who together made at least 50% of the non-bot, attributed commits (1 means one person carries the project).
 - **Unattributed:** commits with a NULL `author_login` are not dropped silently: report their count separately (they're left out of the two numbers above).
-- **Result:** active contributors; concentration; counted commits; unattributed commits.
+- **Bots:** commits by bots (`[bot]` suffix or `Copilot`) are reported as `bot_commits` and left out of the numbers above.
+- **Result:** active contributors; concentration; counted commits (non-bot, attributed: the base for concentration); bot commits; unattributed commits. Counted + bot + unattributed = all commits in the window. No human commits: concentration `None`, counts 0. Note: only "no complete snapshot".
+- `committed_at` is the committer date, so a squash-merged PR is dated when it was merged.
+- No list of named top authors in the output: ranking people is out of scope for v1.
