@@ -18,16 +18,19 @@ Exact definitions for the metric tools. Code follows these; if one is unclear, a
 - **Result:** median hours from issue creation to that comment; the number of issues counted; the number with no response.
 - **Unanswered issues:** the numbers of the first 10 (oldest first), and how many were, at `data_as_of`: closed as completed (`state_reason` `completed` or NULL), closed as not planned (`not_planned` or `duplicate`), or still open (including issues closed after `data_as_of`). The three counts add up to the number with no response.
 - **Note:** "Only issues are counted; Discussions are not included." (unless there is no complete snapshot).
-- Discussions are not counted; repos that answer in Discussions will look less responsive. Planned 2.8: collect discussions and what closed each issue via GraphQL.
-- The state at `data_as_of` is worked out from the issue's current state, `state_reason` and `closed_at` (no history is stored), so an issue reopened or closed again after `data_as_of` can land in the wrong group. Also fixed by the 2.8 GraphQL work (issue events).
+- Discussions are not counted; repos that answer in Discussions will look less responsive. Possible later: collect discussions and what closed each issue via GraphQL.
+- unanswered_closed_completed may include issues that were converted to Discussions (GitHub keeps them as closed/completed).
+- The state at `data_as_of` is worked out from the issue's current state, `state_reason` and `closed_at` (no history is stored), so an issue reopened or closed again after `data_as_of` can land in the wrong group. Possibly fixed later by GraphQL issue events.
 
 ## get_bug_close_rate (default `days` = 365)
-- **Bug:** a non-PR issue with a label matching `\mbug\M` ignoring case (`bug`, `Bug`, `type: bug`, `kind/bug`; not `debug`).
-- **Not labelled:** if no issue of the repo has a bug label, return rate `None` with `note = "not labelled"`, never 0%.
-- **`days`:** must be 30–365 (a shorter window can never hold a bug that had its full 30 days); raise `ValueError` otherwise.
+- **Bug:** a non-PR issue with a label matching `\mbug\M` and not matching `\mnot[\s_-]+a[\s_-]+bug\M`, both ignoring case (`bug`, `Bug`, `type: bug`, `kind/bug`; not `debug`, `Question/Not a bug`, `not-a-bug` or `Not_A_Bug`), whose author is not a bot. The same label rule (bots included) decides "Not labelled" and `labelled_bug_issues`, counting only issues created on or before `data_as_of`.
+- **Not labelled:** if no issue of the repo has a bug label, return rate and counts `None` with `note = "not labelled"`, never 0%.
+- **`days`:** must be 31–365 (the window `(data_as_of - days, data_as_of - 30 days]` is empty for 30 or less); raise `ValueError` otherwise.
 - **Bugs counted:** created in the window **and** at least 30 days before `data_as_of`, so each had its full 30 days. Leave out bugs closed as `not_planned` or `duplicate` on or before `data_as_of` entirely (not in the count). A bug still open at `data_as_of` counts as not fixed, whatever happened to it later.
 - **Fixed:** `state = 'closed'` and `state_reason` is `completed` or NULL, closed within 30 days of creation and on or before `data_as_of`.
-- **Result:** fixed ÷ counted (0–1); the number counted; the number fixed.
+- **Result:** fixed ÷ counted (0–1); the number counted; the number fixed; the numbers of the first 10 counted but not fixed (oldest first); `labelled_bug_issues` (0 when not labelled): Non-PR issues with a bug label among stored issues (all open issues plus those updated in the last 365 days). Very low values mean the repo rarely labels bugs, so the rate is not reliable. Labelled but nothing counted: rate `None`, counts 0, no note.
+- A bug converted to a Discussion counts as fixed (GitHub keeps it as closed/completed).
+- Labels are the current ones, not those at `data_as_of`: a label added or removed later is seen as it is now.
 
 ## get_pr_review_time (default `days` = 90)
 - **PRs:** issues with `is_pull_request = true` joined to `pull_requests`, `is_draft = false`, created in the window, author not a bot.
