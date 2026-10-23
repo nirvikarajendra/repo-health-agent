@@ -41,9 +41,11 @@ Exact definitions for the metric tools. Code follows these; if one is unclear, a
 - **Note:** only "no complete snapshot".
 
 ## get_release_cadence (all collected releases; no `days`)
-- **Releases:** `published_at` not NULL and ≤ `data_as_of`, `is_draft = false`, `is_prerelease = false`.
-- **Result:** days from the latest release to `data_as_of`; the median gap in days between consecutive releases among the **last 5** (so up to 4 gaps); the number of releases.
-- **Edge cases:** no releases → both `None`, `note = "no releases"`; one release → gap `None`.
+- **Releases:** `published_at` not NULL and ≤ `data_as_of`, `is_draft = false`, `is_prerelease = false`. Ordered by `published_at` (then `id`), never by tag.
+- **Result:** the latest release's tag and date; days from it to `data_as_of`; the median gap in days between consecutive releases among the **last 5** (so up to 4 gaps), with the number of gaps and the 5 tags (oldest first); the number of releases; releases in `(data_as_of - 365 days, data_as_of]`. Days are unrounded floats.
+- **Bursts:** a few quick patch releases make the median gap short; `days_since_latest_release` and `releases_last_365_days` are the steadier signals.
+- **Edge cases:** no releases → derived values `None`, counts 0, tags `[]`, `note = "no GitHub releases"`; one release → gap `None`, 0 gaps.
+- Projects that only push git tags or publish to PyPI without GitHub Releases show "no GitHub releases" even though they do release.
 
 ## get_contributor_stats (default `days` = 365)
 - **Commits:** `commits` with `committed_at` in the window. These are always "merged to the default branch": the collector reads only the default branch's history. Never add commits from other branches.

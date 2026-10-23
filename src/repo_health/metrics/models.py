@@ -127,3 +127,29 @@ class PrReviewTime(BaseModel):
     )
     data_as_of: datetime | None = Field(description=DATA_AS_OF)
     note: str | None
+
+
+class ReleaseCadence(BaseModel):
+    full_name: str
+    latest_release_tag: str | None = Field(description="Tag of the latest counted release")
+    latest_release_at: datetime | None = Field(description="When the latest release was published")
+    days_since_latest_release: float | None = Field(
+        description="Days from the latest release to data_as_of"
+    )
+    releases_last_365_days: int | None = Field(
+        description="Releases published in the 365 days up to data_as_of"
+    )
+    median_gap_days: float | None = Field(
+        description="Median days between consecutive releases among the last 5 (up to 4 gaps). "
+        "A burst of quick patch releases makes this short; check days_since_latest_release "
+        "and releases_last_365_days."
+    )
+    gaps_counted: int | None = Field(description="How many gaps the median uses (0-4)")
+    recent_release_tags: list[str] | None = Field(
+        description="Tags of the last 5 releases used for the gaps, oldest first"
+    )
+    releases_counted: int | None = Field(
+        description="Published releases (not drafts or prereleases) up to data_as_of, any date"
+    )
+    data_as_of: datetime | None = Field(description=DATA_AS_OF)
+    note: str | None
