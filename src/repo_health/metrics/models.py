@@ -69,3 +69,28 @@ class FirstResponseTime(BaseModel):
     )
     data_as_of: datetime | None = Field(description=DATA_AS_OF)
     note: str | None
+
+
+class BugCloseRate(BaseModel):
+    full_name: str
+    days: int = Field(description="Window length in days, ending at data_as_of")
+    rate: float | None = Field(
+        description="Share (0-1) of counted bugs closed as completed within 30 days of creation"
+    )
+    bugs_counted: int | None = Field(
+        description="Bug-labelled issues (not from bots) created in the window at least 30 days "
+        "before data_as_of, leaving out those closed as not planned or duplicate"
+    )
+    bugs_fixed: int | None = Field(
+        description="How many counted bugs were closed as completed within 30 days"
+    )
+    unfixed_bug_numbers: list[int] | None = Field(
+        description="Numbers of the first 10 counted bugs not fixed within 30 days, oldest first"
+    )
+    labelled_bug_issues: int | None = Field(
+        description="Non-PR issues with a bug label among stored issues (all open issues plus "
+        "those updated in the last 365 days). Very low values mean the repo rarely labels bugs, "
+        "so the rate is not reliable."
+    )
+    data_as_of: datetime | None = Field(description=DATA_AS_OF)
+    note: str | None
