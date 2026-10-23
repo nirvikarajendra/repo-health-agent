@@ -16,6 +16,10 @@ Exact definitions for the metric tools. Code follows these; if one is unclear, a
 - **Issues:** non-PR issues created in the window whose author is not a maintainer and not a bot.
 - **Response:** the earliest comment (`comments.created_at` ≤ `data_as_of`) by a maintainer who is not a bot and not the issue's author.
 - **Result:** median hours from issue creation to that comment; the number of issues counted; the number with no response.
+- **Unanswered issues:** the numbers of the first 10 (oldest first), and how many were, at `data_as_of`: closed as completed (`state_reason` `completed` or NULL), closed as not planned (`not_planned` or `duplicate`), or still open (including issues closed after `data_as_of`). The three counts add up to the number with no response.
+- **Note:** "Only issues are counted; Discussions are not included." (unless there is no complete snapshot).
+- Discussions are not counted; repos that answer in Discussions will look less responsive. Planned 2.8: collect discussions and what closed each issue via GraphQL.
+- The state at `data_as_of` is worked out from the issue's current state, `state_reason` and `closed_at` (no history is stored), so an issue reopened or closed again after `data_as_of` can land in the wrong group. Also fixed by the 2.8 GraphQL work (issue events).
 
 ## get_bug_close_rate (default `days` = 365)
 - **Bug:** a non-PR issue with a label matching `\mbug\M` ignoring case (`bug`, `Bug`, `type: bug`, `kind/bug`; not `debug`).
