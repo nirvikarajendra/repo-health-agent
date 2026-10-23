@@ -33,10 +33,12 @@ Exact definitions for the metric tools. Code follows these; if one is unclear, a
 - Labels are the current ones, not those at `data_as_of`: a label added or removed later is seen as it is now.
 
 ## get_pr_review_time (default `days` = 90)
-- **PRs:** issues with `is_pull_request = true` joined to `pull_requests`, `is_draft = false`, created in the window, author not a bot.
+- **PRs:** issues with `is_pull_request = true` joined to `pull_requests`, `is_draft = false`, created in the window, whose author is not a maintainer and not a bot (like first response time: it measures how outside contributions are handled).
 - **Drafts:** `is_draft` is the state when collected, so PRs still in draft are left out, and a PR that started as a draft is timed from its creation, not from when it was marked ready (GitHub's data doesn't give that time cheaply). This can make the median longer than the real wait.
-- **First review:** the earliest review per PR by `submitted_at` (not NULL, ≤ `data_as_of`), by a maintainer who is not a bot and not the PR's author (no self-reviews).
+- **First review:** the earliest review per PR by `submitted_at` (not NULL, ≤ `data_as_of`), in any state (`APPROVED`, `CHANGES_REQUESTED`, `COMMENTED`, `DISMISSED`), by a maintainer who is not a bot and not the PR's author (no self-reviews). Plain comments on a PR are not reviews.
 - **Result:** median hours from PR creation to the first review; the number of PRs counted; the number with no review.
+- **Unreviewed PRs:** the numbers of the first 10 (oldest first), and how many were, at `data_as_of`: merged (`merged_at` ≤ `data_as_of`), closed without merging (closed on or before `data_as_of`), or still open (including PRs merged or closed after `data_as_of`). The three counts add up to the number with no review.
+- **Note:** only "no complete snapshot".
 
 ## get_release_cadence (all collected releases; no `days`)
 - **Releases:** `published_at` not NULL and ≤ `data_as_of`, `is_draft = false`, `is_prerelease = false`.

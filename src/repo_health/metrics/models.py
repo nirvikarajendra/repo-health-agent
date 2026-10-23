@@ -94,3 +94,36 @@ class BugCloseRate(BaseModel):
     )
     data_as_of: datetime | None = Field(description=DATA_AS_OF)
     note: str | None
+
+
+class PrReviewTime(BaseModel):
+    full_name: str
+    days: int = Field(description="Window length in days, ending at data_as_of")
+    median_hours: float | None = Field(
+        description="Median hours from PR creation to the first maintainer review, based on "
+        "reviewed PRs only; check prs_counted, as a median of very few PRs means little. "
+        "PRs that started as drafts are timed from creation, which can make this longer than "
+        "the real wait."
+    )
+    prs_counted: int | None = Field(
+        description="Non-draft PRs created in the window by people who aren't maintainers or bots"
+    )
+    prs_without_review: int | None = Field(
+        description="How many of the counted PRs had no formal maintainer review (comments "
+        "and merges alone don't count) by data_as_of"
+    )
+    unreviewed_pr_numbers: list[int] | None = Field(
+        description="Numbers of the first 10 unreviewed PRs, oldest first"
+    )
+    unreviewed_merged: int | None = Field(
+        description="Unreviewed PRs (no formal review) merged by data_as_of"
+    )
+    unreviewed_closed_unmerged: int | None = Field(
+        description="Unreviewed PRs closed without merging by data_as_of"
+    )
+    unreviewed_still_open: int | None = Field(
+        description="Unreviewed PRs still open at data_as_of "
+        "(merging or closing later doesn't count)"
+    )
+    data_as_of: datetime | None = Field(description=DATA_AS_OF)
+    note: str | None
