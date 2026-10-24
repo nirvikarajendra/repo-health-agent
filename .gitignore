@@ -224,3 +224,7 @@ CLAUDE.local.md
 
 # Collector and migration logs
 logs/
+
+# ADK local chat sessions (adk run / adk web); never commit
+.adk/
+session.db
