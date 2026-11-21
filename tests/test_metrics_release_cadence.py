@@ -56,10 +56,11 @@ def test_no_complete_snapshot_gives_all_none_with_note(db_conn, repo_id):
         result.releases_last_365_days,
         result.median_gap_days,
         result.gaps_counted,
+        result.recent_span_days,
         result.recent_release_tags,
         result.releases_counted,
     ]
-    assert numbers == [None] * 8
+    assert numbers == [None] * 9
 
 
 def test_no_releases_gives_note_and_zero_counts(db_conn, repo_id):
@@ -73,6 +74,7 @@ def test_no_releases_gives_note_and_zero_counts(db_conn, repo_id):
     assert (result.days_since_latest_release, result.median_gap_days) == (None, None)
     assert (result.releases_counted, result.releases_last_365_days) == (0, 0)
     assert (result.gaps_counted, result.recent_release_tags) == (0, [])
+    assert result.recent_span_days is None
 
 
 def test_prereleases_and_drafts_are_not_releases(db_conn, repo_id):
@@ -115,6 +117,7 @@ def test_one_release_has_no_gap(db_conn, repo_id):
 
     assert result.median_gap_days is None
     assert (result.gaps_counted, result.recent_release_tags) == (0, ["v1"])
+    assert result.recent_span_days == 0.0
     assert result.note is None
 
 
@@ -142,6 +145,7 @@ def test_gaps_use_only_the_last_5_but_count_uses_all(db_conn, repo_id):
 
     assert (result.median_gap_days, result.gaps_counted) == (1.5, 4)
     assert result.recent_release_tags == ["v3", "v4", "v5", "v6", "v7"]
+    assert result.recent_span_days == 7.0  # From -10 d to -3 d; the older two don't count.
     assert result.releases_counted == 7
 
 
