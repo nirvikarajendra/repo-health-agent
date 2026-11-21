@@ -51,6 +51,10 @@ SELECT r.full_name, r.data_as_of,
        ) AS median_gap_days,
        (SELECT count(gap) FROM last5) AS gaps_counted,
        (
+           SELECT extract(epoch FROM max(published_at) - min(published_at))::float8 / 86400
+           FROM last5
+       ) AS recent_span_days,
+       (
            SELECT coalesce(array_agg(tag ORDER BY published_at, id), '{}')
            FROM last5
        ) AS recent_release_tags,
@@ -74,6 +78,7 @@ def get_release_cadence(conn: psycopg.Connection, repo: str) -> ReleaseCadence |
             releases_last_365_days=None,
             median_gap_days=None,
             gaps_counted=None,
+            recent_span_days=None,
             recent_release_tags=None,
             releases_counted=None,
             data_as_of=None,

@@ -145,6 +145,9 @@ class ReleaseCadence(BaseModel):
         "and releases_last_365_days."
     )
     gaps_counted: int | None = Field(description="How many gaps the median uses (0-4)")
+    recent_span_days: float | None = Field(
+        description="Days from the oldest to the newest of the last 5 releases"
+    )
     recent_release_tags: list[str] | None = Field(
         description="Tags of the last 5 releases used for the gaps, oldest first"
     )

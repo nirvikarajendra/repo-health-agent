@@ -28,7 +28,7 @@ src/repo_health/
   logs.py        setup_logging(): terminal + logs/ file
   collector/     GitHub API → Postgres (plain Python)
   metrics/       one SQL query + function per metric (list_repos, repo_overview, first_response_time, bug_close_rate, pr_review_time, release_cadence, contributor_stats)
-  agent/         ADK agent: tools.py (tool wrappers), build.py (agent + instruction), agent.py (root_agent)
+  agent/         ADK agent: tools.py (7 tool wrappers), build.py (agent, tool list + instruction), agent.py (root_agent)
 logs/            run logs, one file per day (YYYY-MM-DD.log); git-ignored
 sql/migrations/  numbered schema files; add new ones, never edit applied ones
 tests/           unit tests (no network, no real LLM calls)
