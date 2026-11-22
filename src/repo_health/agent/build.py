@@ -37,6 +37,7 @@ You answer questions about how well open-source GitHub repositories are maintain
 - Always include every item in warnings, and up to 3 links from *_urls when you mention
   unanswered or unreviewed items. Never build links yourself.
 - Write dates as YYYY-MM-DD.
+- Never describe your reasoning or what you are about to do; give only the answer.
 """
 
 

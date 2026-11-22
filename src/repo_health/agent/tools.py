@@ -92,7 +92,15 @@ def first_response_warnings(result: dict) -> list[str]:
 
 def pr_review_warnings(result: dict) -> list[str]:
     counted, without = result["prs_counted"], result["prs_without_review"]
-    return median_warnings(counted, without, "PR", "reviewed PR", "a formal review")
+    warnings = median_warnings(counted, without, "PR", "reviewed PR", "a formal review")
+    if without:
+        warnings.append(
+            f"Of the {plural(without, 'PR')} without a maintainer review: "
+            f"{result['unreviewed_merged']} were merged, "
+            f"{result['unreviewed_closed_unmerged']} were closed without merging, "
+            f"{result['unreviewed_still_open']} are still open."
+        )
+    return warnings
 
 
 def bug_close_warnings(result: dict) -> list[str]:
@@ -124,6 +132,10 @@ def release_cadence_warnings(result: dict) -> list[str]:
         )
     if gaps >= 2 and span < BURST_DAYS:
         warnings.append(f"median gap based on a burst: {gaps + 1} releases within {span:.1f} days")
+    if result["days_since_latest_release"] is not None:
+        warnings.append(
+            "Days since the latest release are counted up to the data date (data_as_of), not today."
+        )
     return warnings
 
 
