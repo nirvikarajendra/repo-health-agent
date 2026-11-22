@@ -244,6 +244,7 @@ def test_instruction_keeps_the_rules():
         "up to 3 links from *_urls",
         "Never build links yourself",
         "YYYY-MM-DD",
+        "Never describe your reasoning",
     ]
     for rule in rules:
         assert rule in INSTRUCTION, rule
@@ -271,8 +272,16 @@ def test_wrappers_return_warnings_from_real_results(activity):
             "only 1 stored issue is bug-labelled; rate may not be reliable",
             "rate based on 1 bug",
         ],
-        tools.get_pr_review_time: ["no median: none of the 1 counted PR got a formal review"],
-        tools.get_release_cadence: ["only 1 release; median gap based on 0 gaps"],
+        tools.get_pr_review_time: [
+            "no median: none of the 1 counted PR got a formal review",
+            "Of the 1 PR without a maintainer review: 0 were merged,"
+            " 0 were closed without merging, 1 are still open.",
+        ],
+        tools.get_release_cadence: [
+            "only 1 release; median gap based on 0 gaps",
+            "Days since the latest release are counted up to the data date"
+            " (data_as_of), not today.",
+        ],
         tools.get_contributor_stats: ["based on only 2 commits"],
     }
     for tool, warnings in expected.items():
@@ -302,8 +311,53 @@ def test_not_labelled_bug_warning_is_only_the_note(tracked):
 )
 def test_pr_review_warnings(counted, without, expected):
     result = {"prs_counted": counted, "prs_without_review": without}
+    result |= {"unreviewed_merged": 0, "unreviewed_closed_unmerged": 0}
+    result["unreviewed_still_open"] = without
 
-    assert tools.pr_review_warnings(result) == expected
+    warnings = tools.pr_review_warnings(result)
+
+    # With unreviewed PRs the breakdown comes last; its wording has its own test below.
+    assert (warnings[:-1] if without else warnings) == expected
+
+
+@pytest.mark.parametrize(
+    ("without", "merged", "closed", "still_open", "expected"),
+    [
+        # fastapi-like: 154 unreviewed, most closed unmerged.
+        (
+            154,
+            0,
+            145,
+            9,
+            "Of the 154 PRs without a maintainer review: 0 were merged,"
+            " 145 were closed without merging, 9 are still open.",
+        ),
+        (
+            3,
+            1,
+            1,
+            1,
+            "Of the 3 PRs without a maintainer review: 1 were merged,"
+            " 1 were closed without merging, 1 are still open.",
+        ),
+        (0, 0, 0, 0, None),  # Every PR reviewed: not added.
+    ],
+)
+def test_unreviewed_pr_breakdown_warning(without, merged, closed, still_open, expected):
+    result = {
+        "prs_counted": 155,
+        "prs_without_review": without,
+        "unreviewed_merged": merged,
+        "unreviewed_closed_unmerged": closed,
+        "unreviewed_still_open": still_open,
+    }
+
+    warnings = tools.pr_review_warnings(result)
+
+    if expected is None:
+        assert not any(warning.startswith("Of the") for warning in warnings)
+    else:
+        assert warnings[-1] == expected
 
 
 def test_first_response_warnings_say_answered_issues():
@@ -353,6 +407,28 @@ def test_bug_close_warnings(labelled, counted, expected):
 )
 def test_release_cadence_warnings(releases, gaps, span, expected):
     result = {"releases_counted": releases, "gaps_counted": gaps, "recent_span_days": span}
+    result["days_since_latest_release"] = None  # The data-date warning has its own test.
+
+    assert tools.release_cadence_warnings(result) == expected
+
+
+@pytest.mark.parametrize(
+    ("releases", "days_since", "expected"),
+    [
+        (
+            5,
+            683.0,
+            [
+                "Days since the latest release are counted up to the data date"
+                " (data_as_of), not today."
+            ],
+        ),
+        (0, None, []),  # No releases: not added.
+    ],
+)
+def test_release_cadence_warnings_say_days_count_to_the_data_date(releases, days_since, expected):
+    result = {"releases_counted": releases, "gaps_counted": 4, "recent_span_days": 200.0}
+    result["days_since_latest_release"] = days_since
 
     assert tools.release_cadence_warnings(result) == expected
 
