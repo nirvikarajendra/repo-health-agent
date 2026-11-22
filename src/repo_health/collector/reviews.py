@@ -48,6 +48,15 @@ ON CONFLICT (id) DO UPDATE SET
     submitted_at = EXCLUDED.submitted_at
 """
 
+# Rows of PRs deleted on GitHub, children first. These tables only reference repos (no
+# cascade), and each names the PR number differently.
+DELETE_DELETED_PR_ROWS = (
+    "DELETE FROM reviews WHERE repo_id = %(repo_id)s AND pr_number = ANY(%(numbers)s)",
+    "DELETE FROM comments WHERE repo_id = %(repo_id)s AND issue_number = ANY(%(numbers)s)",
+    "DELETE FROM pull_requests WHERE repo_id = %(repo_id)s AND number = ANY(%(numbers)s)",
+    "DELETE FROM issues WHERE repo_id = %(repo_id)s AND number = ANY(%(numbers)s)",
+)
+
 
 def collect_reviews(
     conn: psycopg.Connection,
@@ -59,15 +68,31 @@ def collect_reviews(
     """Save every review on each PR in `pr_numbers`. Returns the number of distinct reviews saved.
 
     GitHub has no repo-wide reviews endpoint, so this makes at least one request per PR.
+    A PR deleted on GitHub stays in our issues list but its reviews return 404: its rows
+    are removed after the loop (same transaction, so a failed step rolls them back too).
+    Any other HTTP error still fails the repo, before anything is removed.
     """
     seen: set[int] = set()
+    deleted: list[int] = []
     for done, pr_number in enumerate(pr_numbers, start=1):
-        for page in iter_pages(client, f"/repos/{full_name}/pulls/{pr_number}/reviews", {}):
-            rows = [parse_review(item, pr_number) | {"repo_id": repo_id} for item in page]
-            if rows:  # A PR with no reviews yields one empty page.
-                with conn.cursor() as cur:
-                    cur.executemany(UPSERT_REVIEW, rows)
-            seen.update(row["id"] for row in rows)
+        try:
+            for page in iter_pages(client, f"/repos/{full_name}/pulls/{pr_number}/reviews", {}):
+                rows = [parse_review(item, pr_number) | {"repo_id": repo_id} for item in page]
+                if rows:  # A PR with no reviews yields one empty page.
+                    with conn.cursor() as cur:
+                        cur.executemany(UPSERT_REVIEW, rows)
+                seen.update(row["id"] for row in rows)
+        except httpx.HTTPStatusError as error:
+            if error.response.status_code != 404:
+                raise
+            log.warning("reviews: PR #%d returned 404 (deleted on GitHub?), removing", pr_number)
+            deleted.append(pr_number)
         if done % 100 == 0:
             log.info("reviews: %d/%d PRs", done, len(pr_numbers))
+    if deleted:
+        params = {"repo_id": repo_id, "numbers": deleted}
+        for statement in DELETE_DELETED_PR_ROWS:
+            conn.execute(statement, params)
+        numbers = ", ".join(f"#{number}" for number in deleted)
+        log.warning("Removed deleted PRs (%d): %s", len(deleted), numbers)
     return len(seen)
