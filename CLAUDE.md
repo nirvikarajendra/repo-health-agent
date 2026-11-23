@@ -44,7 +44,7 @@ Full design: @docs/architecture.md. Read it before changing data, tables, metric
 - `docs/architecture.md`: full design; `docs/development.md`: setup and workflow
 - `.claude/skills/add-collector-endpoint/`: step-by-step recipe for adding a new GitHub endpoint to the collector
 - `.claude/skills/add-metric/`: recipe for adding a metric tool; `definitions.md` holds the exact metric rules
-- Not created yet: `evals/` (questions, code-computed gold answers, eval runner)
+- `src/repo_health/evals/`: `cases.json` (the 12 eval questions: id, question, expected_tools, kind) and `scoring.py` (pure checks of one answer against the real tool results: right_tools, numbers, data_date, warnings, links, no_leak, refusal; expected values come from the results, never hard-coded). Not created yet: the eval runner.
 
 ## Rules that matter
 - **Agent is read-only.** Agent tools use the read-only DB role and only run fixed, parameterised SQL. No string-formatted SQL, ever.
