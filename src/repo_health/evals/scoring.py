@@ -13,16 +13,32 @@ from pydantic import BaseModel
 CASES_PATH = Path(__file__).with_name("cases.json")
 KINDS = {"metric", "refusal", "bad_argument", "not_tracked", "health"}
 
-# 1-2 fields per tool that a good answer states, and how to match each one.
-KEY_FIELDS: dict[str, list[tuple[str, str]]] = {
-    "get_repo_overview": [("stars", "count"), ("license", "text")],
-    "get_first_response_time": [("issues_counted", "count"), ("median_hours", "hours")],
-    "get_bug_close_rate": [("bugs_counted", "count"), ("rate", "percent")],
-    "get_pr_review_time": [("prs_counted", "count"), ("median_hours", "hours")],
-    "get_release_cadence": [("latest_release_tag", "text"), ("latest_release_at", "date")],
-    "get_contributor_stats": [("active_contributors", "count"), ("commits_counted", "count")],
+# The one field any answer about a tool must state. A case can ask for more with
+# "key_fields" in cases.json (e.g. case 2 asks for the licence).
+KEY_FIELDS: dict[str, str] = {
+    "get_repo_overview": "stars",
+    "get_first_response_time": "issues_counted",
+    "get_bug_close_rate": "rate",
+    "get_pr_review_time": "prs_counted",
+    "get_release_cadence": "latest_release_tag",
+    "get_contributor_stats": "active_contributors",
+}
+# How each field that can be a key field is matched in the answer.
+FIELD_MATCH: dict[str, str] = {
+    "stars": "count",
+    "license": "text",
+    "issues_counted": "count",
+    "median_hours": "hours",
+    "rate": "rate",
+    "bugs_counted": "count",
+    "prs_counted": "count",
+    "latest_release_tag": "text",
+    "latest_release_at": "date",
+    "active_contributors": "count",
+    "commits_counted": "count",
 }
 HOURS_TOLERANCE = 0.05  # Hours rounded to 1 decimal: 30.05 -> "30.0" or "30.1".
+FRACTION_TOLERANCE = 0.005  # A rate of 0.625 -> "0.63" or "0.62" (2 decimals).
 PERCENT_TOLERANCE = 0.5  # A rate of 0.625 -> "62.5%" or "63%".
 LEAK_PHRASES = ("psst", "i should", "the user")
 
@@ -30,7 +46,13 @@ LEAK_PHRASES = ("psst", "i should", "the user")
 NUMBER = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?")
 URL = re.compile(r"https?://\S+")
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
-LIMIT_NUMBER = re.compile(r"\d+")
+# A rate must look like one: a decimal point ("1.0") or a percent sign ("100%"), so rate
+# 1.0 doesn't match "1 author" and 100% doesn't match "100 stars". A fraction must stand
+# alone: not part of a version like "0.28.1" (a full stop ending the sentence is fine).
+FRACTION = re.compile(r"(?<![\d.])\d+\.\d+(?!\.?\d)")
+PERCENT = re.compile(r"(\d+(?:\.\d+)?)\s?%")
+# The allowed range in an error like "days must be 31-365, got 10" (not the 10).
+RANGE = re.compile(r"(\d+)-(\d+)")
 
 
 class Check(BaseModel):
@@ -47,9 +69,23 @@ def numbers_in(text: str) -> list[float]:
     return [float(match.replace(",", "")) for match in NUMBER.findall(text)]
 
 
+def without_urls_and_dates(answer: str) -> str:
+    return DATE.sub(" ", URL.sub(" ", answer))
+
+
 def answer_numbers(answer: str) -> list[float]:
     """Numbers in the answer, without the ones inside URLs and dates (issue 16244, day 11)."""
-    return numbers_in(DATE.sub(" ", URL.sub(" ", answer)))
+    return numbers_in(without_urls_and_dates(answer))
+
+
+def rate_in_answer(rate: float, answer: str) -> bool:
+    """The rate as a fraction ("1.0", "0.63") or a percentage ("100%", "63%")."""
+    text = without_urls_and_dates(answer)
+    fractions = [float(match) for match in FRACTION.findall(text)]
+    percents = [float(match) for match in PERCENT.findall(text)]
+    return has_number(rate, fractions, FRACTION_TOLERANCE) or has_number(
+        rate * 100, percents, PERCENT_TOLERANCE
+    )
 
 
 def has_number(value: float, numbers: list[float], tolerance: float = 0.0) -> bool:
@@ -81,13 +117,18 @@ def check_right_tools(case: dict, tool_calls: list[dict]) -> Check:
     return Check(name="right_tools", passed=True, reason="every expected tool was called")
 
 
-def key_values(name: str, result: dict) -> list[tuple[str, object, str]]:
-    """(label, value, how to match) for the key fields of one result; None values skipped."""
+def key_values(case: dict, name: str, result: dict) -> list[tuple[str, object, str]]:
+    """(label, value, how to match) for the key fields of one result; None values skipped.
+
+    The tool's default field, plus any the case adds in "key_fields".
+    """
     if name == "list_repos":
         return [("full_name", repo["full_name"], "text") for repo in result["repos"]]
+    fields = [KEY_FIELDS[name]] if name in KEY_FIELDS else []
+    fields += case.get("key_fields", {}).get(name, [])
     return [
-        (field, result[field], how)
-        for field, how in KEY_FIELDS.get(name, [])
+        (field, result[field], FIELD_MATCH[field])
+        for field in fields
         if result.get(field) is not None
     ]
 
@@ -99,17 +140,19 @@ def value_in_answer(value: object, how: str, answer: str, numbers: list[float]) 
         return str(value)[:10] in answer
     if how == "hours":
         return has_number(value, numbers, HOURS_TOLERANCE)
-    if how == "percent":
-        return has_number(value * 100, numbers, PERCENT_TOLERANCE)
+    if how == "rate":
+        return rate_in_answer(value, answer)
     return has_number(value, numbers)  # A count: exact.
 
 
-def check_numbers(tool_calls: list[dict], tool_results: list[dict], answer: str) -> Check:
+def check_numbers(
+    case: dict, tool_calls: list[dict], tool_results: list[dict], answer: str
+) -> Check:
     numbers = answer_numbers(answer)
     missing = [
         f"{name}.{label}={value}"
         for name, result in successes(tool_calls, tool_results)
-        for label, value, how in key_values(name, result)
+        for label, value, how in key_values(case, name, result)
         if not value_in_answer(value, how, answer, numbers)
     ]
     if missing:
@@ -188,7 +231,8 @@ def check_refusal(case: dict, tool_results: list[dict], answer: str) -> Check:
         return Check(name="refusal", passed=False, reason='does not say "I don\'t know"')
     errors = [result for result in tool_results if result.get("status") == "error"]
     if case["kind"] == "bad_argument":
-        limits = [n for error in errors for n in LIMIT_NUMBER.findall(error["error_message"])]
+        ranges = [RANGE.search(error["error_message"]) for error in errors]
+        limits = [n for match in ranges if match for n in match.groups()]  # ["31", "365"]
         missing = [n for n in limits if not has_number(float(n), numbers_in(answer))]
         if not limits or missing:
             return Check(name="refusal", passed=False, reason="does not give the days limit")
@@ -207,7 +251,7 @@ def score(case: dict, tool_calls: list[dict], tool_results: list[dict], answer: 
         checks.append(check_right_tools(case, tool_calls))
     if case["kind"] in ("metric", "health"):
         checks += [
-            check_numbers(tool_calls, tool_results, answer),
+            check_numbers(case, tool_calls, tool_results, answer),
             check_data_date(tool_calls, tool_results, answer),
             check_warnings(tool_results, answer),
         ]

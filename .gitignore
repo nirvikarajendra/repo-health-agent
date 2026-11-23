@@ -228,3 +228,6 @@ logs/
 # ADK local chat sessions (adk run / adk web); never commit
 .adk/
 session.db
+
+# Eval results (python -m repo_health.evals.run); local only
+evals-results/
