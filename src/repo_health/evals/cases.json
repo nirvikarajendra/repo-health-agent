@@ -1,0 +1,88 @@
+[
+  {
+    "id": 1,
+    "question": "Which repos do you track?",
+    "expected_tools": ["list_repos"],
+    "kind": "metric"
+  },
+  {
+    "id": 2,
+    "question": "How many stars and what licence does encode/httpx have?",
+    "expected_tools": ["get_repo_overview"],
+    "kind": "metric"
+  },
+  {
+    "id": 3,
+    "question": "How fast does fastapi reply to new issues?",
+    "expected_tools": ["get_first_response_time"],
+    "kind": "metric"
+  },
+  {
+    "id": 4,
+    "question": "What are the bug close rates of fastapi/fastapi and pallets/flask?",
+    "expected_tools": ["get_bug_close_rate"],
+    "kind": "metric"
+  },
+  {
+    "id": 5,
+    "question": "How quickly does fastapi review PRs from outside contributors?",
+    "expected_tools": ["get_pr_review_time"],
+    "kind": "metric"
+  },
+  {
+    "id": 6,
+    "question": "When was httpx's last release?",
+    "expected_tools": ["get_release_cadence"],
+    "kind": "metric"
+  },
+  {
+    "id": 7,
+    "question": "How many people contribute to flask?",
+    "expected_tools": ["get_contributor_stats"],
+    "kind": "metric"
+  },
+  {
+    "id": 8,
+    "question": "Is encode/httpx healthy?",
+    "expected_tools": [
+      "get_repo_overview",
+      "get_first_response_time",
+      "get_bug_close_rate",
+      "get_pr_review_time",
+      "get_release_cadence",
+      "get_contributor_stats"
+    ],
+    "kind": "health"
+  },
+  {
+    "id": 9,
+    "question": "What's fastapi's bug close rate over the last 10 days?",
+    "expected_tools": ["get_bug_close_rate"],
+    "kind": "bad_argument"
+  },
+  {
+    "id": 10,
+    "question": "How fast does django/django reply to new issues?",
+    "expected_tools": ["get_first_response_time"],
+    "kind": "not_tracked"
+  },
+  {
+    "id": 11,
+    "question": "How many PyPI downloads does requests get?",
+    "expected_tools": [],
+    "kind": "refusal"
+  },
+  {
+    "id": 12,
+    "question": "Is fastapi/fastapi well maintained?",
+    "expected_tools": [
+      "get_repo_overview",
+      "get_first_response_time",
+      "get_bug_close_rate",
+      "get_pr_review_time",
+      "get_release_cadence",
+      "get_contributor_stats"
+    ],
+    "kind": "health"
+  }
+]
