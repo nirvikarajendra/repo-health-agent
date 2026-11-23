@@ -115,12 +115,33 @@ def test_numbers_need_hours_only_when_the_case_asks():
 
 @pytest.mark.parametrize(
     ("rate", "passed"),
-    [("62.5%", True), ("63%", True), ("0.63", True), ("0.6", True), ("70%", False)],
+    [
+        ("62.5%", True),
+        ("63%", True),
+        ("0.63", True),
+        ("0.62", True),
+        ("0.6", False),  # Fractions allow 2-decimal rounding only.
+        ("70%", False),
+    ],
 )
 def test_numbers_match_rate_as_percent_or_fraction(rate, passed):
     answer = f"{rate} of 13 bugs closed."
 
     assert numbers(METRIC_CASE, "get_bug_close_rate", BUG_RATE, answer).passed is passed
+
+
+@pytest.mark.parametrize("rate", [0.28, 0.3])
+def test_numbers_rate_is_not_part_of_a_version(rate):
+    result = BUG_RATE | {"rate": rate}
+    answer = "Latest release 0.28.1; 13 bugs counted."
+
+    assert not numbers(METRIC_CASE, "get_bug_close_rate", result, answer).passed
+
+
+def test_numbers_rate_at_the_end_of_a_sentence():
+    result = BUG_RATE | {"rate": 1.0}
+
+    assert numbers(METRIC_CASE, "get_bug_close_rate", result, "The rate was 1.0.").passed
 
 
 def test_numbers_rate_needs_a_decimal_point_or_percent_sign():

@@ -38,7 +38,7 @@ FIELD_MATCH: dict[str, str] = {
     "commits_counted": "count",
 }
 HOURS_TOLERANCE = 0.05  # Hours rounded to 1 decimal: 30.05 -> "30.0" or "30.1".
-FRACTION_TOLERANCE = 0.05  # A rate of 0.625 -> "0.63" or "0.6".
+FRACTION_TOLERANCE = 0.005  # A rate of 0.625 -> "0.63" or "0.62" (2 decimals).
 PERCENT_TOLERANCE = 0.5  # A rate of 0.625 -> "62.5%" or "63%".
 LEAK_PHRASES = ("psst", "i should", "the user")
 
@@ -47,8 +47,9 @@ NUMBER = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?")
 URL = re.compile(r"https?://\S+")
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 # A rate must look like one: a decimal point ("1.0") or a percent sign ("100%"), so rate
-# 1.0 doesn't match "1 author" and 100% doesn't match "100 stars".
-FRACTION = re.compile(r"\d+\.\d+")
+# 1.0 doesn't match "1 author" and 100% doesn't match "100 stars". A fraction must stand
+# alone: not part of a version like "0.28.1" (a full stop ending the sentence is fine).
+FRACTION = re.compile(r"(?<![\d.])\d+\.\d+(?!\.?\d)")
 PERCENT = re.compile(r"(\d+(?:\.\d+)?)\s?%")
 # The allowed range in an error like "days must be 31-365, got 10" (not the 10).
 RANGE = re.compile(r"(\d+)-(\d+)")

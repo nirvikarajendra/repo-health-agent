@@ -36,6 +36,7 @@
     "id": 6,
     "question": "When was httpx's last release?",
     "expected_tools": ["get_release_cadence"],
+    "key_fields": {"get_release_cadence": ["latest_release_at"]},
     "kind": "metric"
   },
   {

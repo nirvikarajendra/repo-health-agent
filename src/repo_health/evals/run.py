@@ -4,7 +4,7 @@
     uv run python -m repo_health.evals.run --cases 1,10 --runs 1
 
 Calls Gemini (needs GOOGLE_API_KEY and GEMINI_MODEL in .env). Results are saved to
-evals-results/YYYY-MM-DD-HHMM.json.
+evals-results/YYYY-MM-DD-HHMMSS.json.
 """
 
 import argparse
@@ -136,7 +136,7 @@ def print_summary(cases: list[dict], results: list[dict]) -> None:
 
 def save(output: dict) -> Path:
     RESULTS_DIR.mkdir(exist_ok=True)
-    path = RESULTS_DIR / f"{datetime.now():%Y-%m-%d-%H%M}.json"
+    path = RESULTS_DIR / f"{datetime.now():%Y-%m-%d-%H%M%S}.json"
     path.write_text(json.dumps(output, indent=2))
     return path
 
@@ -177,15 +177,18 @@ def main() -> None:
                 result, requests = run_case(runner, case, run)
                 output["results"].append(result)
                 time.sleep(SECONDS_PER_REQUEST * requests)  # Stay under 15 requests/minute.
-    except errors.APIError as error:
-        if error.code != 429:
-            raise
-        # ADK adds a long "possible fix" text to the message; the code and status are enough.
-        output["stopped_early"] = f"Gemini quota reached: {error.code} {error.status}"
-        print("\nGemini quota reached (429), stopping. Saving what we have.")
-
-    print_summary(cases, output["results"])
-    print(f"\nSaved {save(output)}")
+    # KeyboardInterrupt is listed because Ctrl+C is not an Exception subclass.
+    except (Exception, KeyboardInterrupt) as error:
+        if isinstance(error, errors.APIError) and error.code == 429:
+            # ADK adds a long "possible fix" text to the message; the code and status are enough.
+            output["stopped_early"] = f"Gemini quota reached: {error.code} {error.status}"
+            print("\nGemini quota reached (429), stopping. Saving what we have.")
+        else:
+            output["stopped_early"] = f"{type(error).__name__}: {error}"
+            raise  # Show the traceback, after the finally block has saved the results.
+    finally:
+        print_summary(cases, output["results"])
+        print(f"\nSaved {save(output)}")
     if output["stopped_early"]:
         sys.exit(1)
 
