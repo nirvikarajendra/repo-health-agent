@@ -46,6 +46,9 @@ def test_cases_are_valid():
         assert case["question"], case["id"]
         assert case["kind"] in scoring.KINDS, case["id"]
         assert set(case["expected_tools"]) <= tool_names, case["id"]
+        for tool, fields in case.get("key_fields", {}).items():
+            assert tool in tool_names, case["id"]
+            assert set(fields) <= set(scoring.FIELD_MATCH), case["id"]
 
 
 # --- right_tools ---
@@ -66,47 +69,65 @@ def test_right_tools_names_the_missing_tool():
 
 # --- numbers ---
 
+HOURS_CASE = METRIC_CASE | {"key_fields": {"get_pr_review_time": ["median_hours"]}}
 
-@pytest.mark.parametrize(
-    "answer",
-    [
-        "105,057 stars, MIT licence.",
-        "105057 stars under the mit license.",
-    ],
-)
-def test_numbers_pass_with_commas_and_any_case(answer):
-    check = scoring.check_numbers([call("get_repo_overview")], [OVERVIEW], answer)
+
+def numbers(case, name, result, answer) -> scoring.Check:
+    return scoring.check_numbers(case, [call(name)], [result], answer)
+
+
+@pytest.mark.parametrize("answer", ["105,057 stars.", "It has 105057 stars."])
+def test_numbers_pass_with_commas(answer):
+    check = numbers(METRIC_CASE, "get_repo_overview", OVERVIEW, answer)
 
     assert check.passed, check.reason
 
 
 def test_numbers_fail_names_the_missing_field():
-    check = scoring.check_numbers([call("get_repo_overview")], [OVERVIEW], "105,000 stars, MIT.")
+    check = numbers(METRIC_CASE, "get_repo_overview", OVERVIEW, "105,000 stars, MIT.")
 
     assert not check.passed
     assert "stars=105057" in check.reason
 
 
-@pytest.mark.parametrize(("hours", "passed"), [("30.05", True), ("30.0", True), ("30.1", True)])
-def test_numbers_allow_hours_rounded_to_one_decimal(hours, passed):
+@pytest.mark.parametrize("hours", ["30.05", "30.0", "30.1"])
+def test_numbers_allow_hours_rounded_to_one_decimal(hours):
     answer = f"Median {hours} hours over 131 PRs."
-    check = scoring.check_numbers([call("get_pr_review_time")], [REVIEW], answer)
 
-    assert check.passed is passed
+    assert numbers(HOURS_CASE, "get_pr_review_time", REVIEW, answer).passed
 
 
 def test_numbers_fail_hours_off_by_more_than_rounding():
     answer = "Median 31 hours over 131 PRs."
 
-    assert not scoring.check_numbers([call("get_pr_review_time")], [REVIEW], answer).passed
+    assert not numbers(HOURS_CASE, "get_pr_review_time", REVIEW, answer).passed
 
 
-@pytest.mark.parametrize(("rate", "passed"), [("62.5%", True), ("63%", True), ("70%", False)])
-def test_numbers_match_rate_as_percent(rate, passed):
+def test_numbers_need_hours_only_when_the_case_asks():
+    answer = "131 PRs counted."  # No median.
+
+    assert numbers(METRIC_CASE, "get_pr_review_time", REVIEW, answer).passed
+    assert not numbers(HOURS_CASE, "get_pr_review_time", REVIEW, answer).passed
+    # The case asks, but the median is None: skipped (case 3 today).
+    no_median = REVIEW | {"median_hours": None}
+    assert numbers(HOURS_CASE, "get_pr_review_time", no_median, answer).passed
+
+
+@pytest.mark.parametrize(
+    ("rate", "passed"),
+    [("62.5%", True), ("63%", True), ("0.63", True), ("0.6", True), ("70%", False)],
+)
+def test_numbers_match_rate_as_percent_or_fraction(rate, passed):
     answer = f"{rate} of 13 bugs closed."
-    check = scoring.check_numbers([call("get_bug_close_rate")], [BUG_RATE], answer)
 
-    assert check.passed is passed
+    assert numbers(METRIC_CASE, "get_bug_close_rate", BUG_RATE, answer).passed is passed
+
+
+def test_numbers_rate_needs_a_decimal_point_or_percent_sign():
+    # Rate 1.0 must not match "1 author", and 100% must not match "100 stars".
+    result = BUG_RATE | {"rate": 1.0}
+
+    assert not numbers(METRIC_CASE, "get_bug_close_rate", result, "1 author, 100 stars.").passed
 
 
 def test_numbers_ignore_urls_and_dates():
@@ -114,21 +135,93 @@ def test_numbers_ignore_urls_and_dates():
     result = REVIEW | {"median_hours": None, "prs_counted": 131}
     answer = "See https://github.com/o/r/pull/131 (data as of 2026-11-13)."
 
-    assert not scoring.check_numbers([call("get_pr_review_time")], [result], answer).passed
+    assert not numbers(METRIC_CASE, "get_pr_review_time", result, answer).passed
 
 
 def test_numbers_skip_none_values_and_error_results():
     result = REVIEW | {"median_hours": None}
     calls = [call("get_pr_review_time"), call("get_bug_close_rate")]
 
-    assert scoring.check_numbers(calls, [result, BAD_DAYS], "131 PRs counted.").passed
+    check = scoring.check_numbers(HOURS_CASE, calls, [result, BAD_DAYS], "131 PRs counted.")
+
+    assert check.passed
 
 
 def test_numbers_list_repos_need_every_name():
     result = {"status": "success", "repos": [{"full_name": "encode/httpx", "data_as_of": AS_OF}]}
 
-    assert scoring.check_numbers([call("list_repos")], [result], "encode/httpx").passed
-    assert not scoring.check_numbers([call("list_repos")], [result], "httpx").passed
+    assert numbers(METRIC_CASE, "list_repos", result, "encode/httpx").passed
+    assert not numbers(METRIC_CASE, "list_repos", result, "httpx").passed
+
+
+# --- numbers: real answers from evals-results/2026-11-22-2108.json ---
+
+FASTAPI_BUGS = {"status": "success", "bugs_counted": 13, "rate": 1.0, "data_as_of": AS_OF}
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        # Case 12, run 2.
+        "- Bug close rate: Over the 365 days ending on 2026-11-22, the bug close rate was 1.0, "
+        "with 13 out of 13 counted bugs closed as completed within 30 days",
+        # Case 4, run 3.
+        "- fastapi/fastapi: 1.00 (13 out of 13 counted bugs closed as completed within 30 days)"
+        " as of 2026-11-22.",
+    ],
+)
+def test_real_answers_give_the_rate_as_a_fraction(answer):
+    case = {"id": 4, "expected_tools": ["get_bug_close_rate"], "kind": "metric"}
+
+    assert numbers(case, "get_bug_close_rate", FASTAPI_BUGS, answer).passed
+
+
+def test_real_answer_counting_people_needs_no_commit_count():
+    # Case 7, run 1: the question asks how many people, not how many commits.
+    case = scoring.load_cases()[6]
+    result = {
+        "status": "success",
+        "active_contributors": 6,
+        "commits_counted": 91,
+        "data_as_of": AS_OF,
+    }
+    answer = (
+        "Based on data collected as of 2026-11-22, there were 6 active contributors (distinct "
+        "people excluding bots with a commit on the default branch) over the 365 days leading "
+        "up to that date for `pallets/flask`."
+    )
+
+    assert numbers(case, "get_contributor_stats", result, answer).passed
+
+
+HTTPX_OVERVIEW = {
+    "status": "success",
+    "stars": 15838,
+    "license": "BSD-3-Clause",
+    "data_as_of": AS_OF,
+}
+# Case 8, run 1: stars but no licence.
+HTTPX_HEALTH_LINE = (
+    "Overview: encode/httpx has 15838 stars, 2033 forks, and 153 open issues"
+    " (data_as_of: 2026-11-22)."
+)
+
+
+def test_real_health_answer_needs_no_licence():
+    case = scoring.load_cases()[7]  # Case 8: "Is encode/httpx healthy?"
+
+    assert numbers(case, "get_repo_overview", HTTPX_OVERVIEW, HTTPX_HEALTH_LINE).passed
+
+
+def test_licence_question_needs_the_licence():
+    case = scoring.load_cases()[1]  # Case 2 asks for the licence in key_fields.
+
+    check = numbers(case, "get_repo_overview", HTTPX_OVERVIEW, HTTPX_HEALTH_LINE)
+
+    assert not check.passed
+    assert "license=BSD-3-Clause" in check.reason
+    answer = "encode/httpx has 15838 stars and the BSD-3-Clause license."
+    assert numbers(case, "get_repo_overview", HTTPX_OVERVIEW, answer).passed
 
 
 # --- data_date ---
@@ -235,6 +328,16 @@ def test_bad_argument_needs_the_limit_from_the_error():
 
     assert scoring.check_refusal(case, [BAD_DAYS], good).passed
     assert not scoring.check_refusal(case, [BAD_DAYS], "I don't know.").passed
+
+
+def test_real_bad_argument_answer_needs_only_the_range():
+    # Case 9, run 3: gives 31 and 365 but not the 10 the model asked for ("got 10").
+    case = {"kind": "bad_argument"}
+    answer = "I don't know because the window length of days must be between 31 and 365."
+
+    assert scoring.check_refusal(case, [BAD_DAYS], answer).passed
+    half = "I don't know because the window must be at least 31 days."
+    assert not scoring.check_refusal(case, [BAD_DAYS], half).passed
 
 
 def test_not_tracked_needs_every_tracked_repo():

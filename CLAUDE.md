@@ -27,6 +27,8 @@ Full design: @docs/architecture.md. Read it before changing data, tables, metric
 - Apply DB migrations: `uv run python -m repo_health.migrate`
 - Collect repos into Postgres: `uv run python -m repo_health.collector OWNER/REPO [OWNER/REPO ...]` (a failed repo is skipped; exit code 1 if any failed)
 - Chat with the agent (calls Gemini; needs `GOOGLE_API_KEY` and `GEMINI_MODEL` in `.env`): `uv run adk run src/repo_health/agent`
+- Run the evals (calls Gemini): `uv run python -m repo_health.evals.run --runs 3` (a small run: `--cases 1,10 --runs 1`)
+- Re-score a saved eval run with the current checks (no Gemini calls, file unchanged): `uv run python -m repo_health.evals.run --rescore evals-results/<file>.json`
 
 ## Layout
 - `pyproject.toml`: project metadata, dev dependencies (pytest, ruff), ruff config
@@ -44,7 +46,7 @@ Full design: @docs/architecture.md. Read it before changing data, tables, metric
 - `docs/architecture.md`: full design; `docs/development.md`: setup and workflow
 - `.claude/skills/add-collector-endpoint/`: step-by-step recipe for adding a new GitHub endpoint to the collector
 - `.claude/skills/add-metric/`: recipe for adding a metric tool; `definitions.md` holds the exact metric rules
-- `src/repo_health/evals/`: `cases.json` (the 12 eval questions: id, question, expected_tools, kind) and `scoring.py` (pure checks of one answer against the real tool results: right_tools, numbers, data_date, warnings, links, no_leak, refusal; expected values come from the results, never hard-coded). Not created yet: the eval runner.
+- `src/repo_health/evals/`: `cases.json` (the 12 eval questions: id, question, expected_tools, kind) and `scoring.py` (pure checks of one answer against the real tool results: right_tools, numbers, data_date, warnings, links, no_leak, refusal; expected values come from the results, never hard-coded) and `run.py` (the eval runner: asks each case in a fresh ADK session, `extract_turn()` turns the events into tool calls, results and answer, scores them, waits 4 s per Gemini request, stops cleanly on a 429, saves to `evals-results/`, git-ignored).
 
 ## Rules that matter
 - **Agent is read-only.** Agent tools use the read-only DB role and only run fixed, parameterised SQL. No string-formatted SQL, ever.

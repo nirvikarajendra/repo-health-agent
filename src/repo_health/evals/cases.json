@@ -9,12 +9,14 @@
     "id": 2,
     "question": "How many stars and what licence does encode/httpx have?",
     "expected_tools": ["get_repo_overview"],
+    "key_fields": {"get_repo_overview": ["license"]},
     "kind": "metric"
   },
   {
     "id": 3,
     "question": "How fast does fastapi reply to new issues?",
     "expected_tools": ["get_first_response_time"],
+    "key_fields": {"get_first_response_time": ["median_hours"]},
     "kind": "metric"
   },
   {
@@ -27,6 +29,7 @@
     "id": 5,
     "question": "How quickly does fastapi review PRs from outside contributors?",
     "expected_tools": ["get_pr_review_time"],
+    "key_fields": {"get_pr_review_time": ["median_hours"]},
     "kind": "metric"
   },
   {
